@@ -1,0 +1,20 @@
+/ {
+    aliases {
+
+    };
+
+    custom-bus485 {
+        bus485_1: custom_bus485_1 {
+            compatible = "custom,bus485";
+            pin = <&dir>
+        };
+    };
+
+    leds {
+        compatible = "gpio-leds"
+        dir: leds {
+            gpios = <&gpiob 14 GPIO_ACTIVE_LOW>;
+        };
+        
+    };
+};

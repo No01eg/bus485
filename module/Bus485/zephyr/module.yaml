@@ -1,0 +1,6 @@
+name: bus485
+build:
+  cmake: .
+  kconfig: kconfig
+  settings:
+    dts_root: .

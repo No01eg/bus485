@@ -1,0 +1,11 @@
+description: Custom bus485
+
+compatible: "custom,bus485"
+
+properties:
+  pin:
+    type: phandle
+    required: true
+  uart:
+    type: label
+    required: true

@@ -1,0 +1,7 @@
+config CUSTOM_BUS485
+    bool "Custom bus485"
+    default n 
+    depends on GPIO 
+    depends on UART
+    help
+        Enable the custom bus485 driver.

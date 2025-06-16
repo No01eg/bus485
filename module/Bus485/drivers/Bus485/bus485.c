@@ -131,6 +131,26 @@ static int32_t b485_set_baudrate(const struct device * dev,
 {
     int ret;
 
+    struct uart_config config;
+
+    const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
+
+    const struct device * uart = cfg->uart_dev;
+
+    ret = uart_get_config(uart, &config);
+    if(ret < 0){
+        LOG_ERR("Error (%d): failed to read uart param\r\n");
+        return ret;
+    }
+
+    config.baudrate = baudrate;
+
+    ret = uart_configure(uart, &config);
+    if(ret < 0){
+        LOG_ERR("Error (%d): failed to accept new uart param\r\n");
+        return ret;
+    }
+
     return 0;
 }
 

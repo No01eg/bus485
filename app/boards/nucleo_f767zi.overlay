@@ -6,7 +6,8 @@
     custom-bus485 {
         bus485_1: custom_bus485_1 {
             compatible = "custom,bus485";
-            pin = <&dir>
+            pin = <&dir>;
+            uart = <&uart2>
         };
     };
 

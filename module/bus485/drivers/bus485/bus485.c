@@ -137,7 +137,7 @@ static int32_t b485_set_baudrate(const struct device * dev,
 
     const struct device * uart = cfg->uart_dev;
 
-    ret = uart_get_config(uart, &config);
+    ret = uart_config_get(uart, &config);
     if(ret < 0){
         LOG_ERR("Error (%d): failed to read uart param\r\n");
         return ret;
@@ -155,21 +155,20 @@ static int32_t b485_set_baudrate(const struct device * dev,
 }
 
 //--------Devicetree handling --------------------
-static const bus485_driver_api bus485_driver_api_funcs {
+static const struct bus485_driver_api bus485_driver_api_funcs = {
     .bus485_lock = b485_lock,
     .bus485_release = b485_release,
     .bus485_send = b485_send,
     .bus485_recv = b485_recv,
-    .bus485_flush = b485_flush,
-    .bus485_set_baudrate = b485_set_baudrate
+    .bus485_flush = b485_flush, 
+    .bus485_set_baudrate = b485_set_baudrate,
 };
 
 //macro to define driver instance
 #define BUS485_DEFINE(inst)\
     static const struct bus485_config bus485_config_##inst = {      \
-        .dir = GPIO_DT_SPEC_GET(                                    \
-            DT_PHANDLE(DT_INST(inst, custom_bus485), pin), gpios),  \
-        .uart_dev = DT_LABEL(DT_PHANDLE(DT_INST(inst, custom_bus485), uart)),\
+        .dir = GPIO_DT_SPEC_INST_GET(inst, pin_gpios),  \
+        .uart_dev = DEVICE_DT_GET(DT_INST_BUS(inst)),\
         .id = inst                                                              \
     };          \
     DEVICE_DT_INST_DEFINE(inst,                                 \

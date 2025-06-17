@@ -1,21 +1,11 @@
-/ {
-    aliases {
 
-    };
-
-    custom-bus485 {
-        bus485_1: custom_bus485_1 {
-            compatible = "custom,bus485";
-            pin = <&dir>;
-            uart = <&uart2>
-        };
-    };
-
-    leds {
-        compatible = "gpio-leds"
-        dir: leds {
-            gpios = <&gpiob 14 GPIO_ACTIVE_LOW>;
-        };
-        
+&usart2 {
+    status="okay";
+    current-speed = <115200>;
+    b485: custom_bus4850 {
+        compatible = "custom,bus485";
+        status="okay";
+        pin-gpios = <&gpiob 14 GPIO_ACTIVE_LOW>;
+        label="custom_bus4850";
     };
 };

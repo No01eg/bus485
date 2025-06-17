@@ -2,10 +2,9 @@ description: Custom bus485
 
 compatible: "custom,bus485"
 
+include: uart-device.yaml
+
 properties:
-  pin:
-    type: phandle
-    required: true
-  uart:
-    type: label
+  pin-gpios:
+    type: phandle-array
     required: true

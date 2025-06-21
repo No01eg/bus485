@@ -131,12 +131,12 @@ static int32_t b485_send(const struct device * dev,
     while(!uart_irq_tx_complete(uart_dev))
         k_sleep(K_USEC(1));
     
-    ret = gpio_pin_set_dt(dir, 0);//may be it's call in callback
+    ret = gpio_pin_set_dt(dir, 0);
     if(ret < 0){
         LOG_ERR("Error (%d): failed to reset dir pin\r\n", ret);
         return ret;
     }
-    return 0;
+    return total_send;
 }
 
 static int32_t b485_recv(const struct device * dev,

@@ -33,6 +33,15 @@ static int32_t b485_set_baudrate(const struct device * dev,
 
 //----private------------------------------------------------
 
+static void interrupt_handler(const struct device *dev, void *user_data)
+{
+    ARG_UNUSED(user_data);
+
+    while(uart_irq_update(dev) && uart_irq_is_pending(dev)){
+
+    }
+}
+
 static int bus485_init(const struct device * dev)
 {
     int ret;
@@ -42,10 +51,11 @@ static int bus485_init(const struct device * dev)
     const struct gpio_dt_spec *dir = &cfg->dir;
 
     
-    const struct device *uart = &cfg->uart_dev;
+    const struct device *uart_dev = cfg->uart_dev;
     LOG_DBG("Initializing bus485 (instance ID: %u)\r\n", cfg->id);
 
-    if(!uart){
+    //if (!device_is_ready(uart_dev)){
+    if(!uart_dev){
         LOG_ERR("UART is not found\r\n");
         return -ENODEV;
     }
@@ -61,9 +71,14 @@ static int bus485_init(const struct device * dev)
         return -ENODEV;
     }
 
-    //!TODO CONFIGURE UART
+    uart_irq_rx_disable(uart_dev);
+	uart_irq_tx_disable(uart_dev);
+    ret = uart_irq_callback_user_data_set(uart_dev, interrupt_handler, NULL);
 
-    
+    if(ret < 0){
+        LOG_ERR("Could not accept interrupt for uart (%d)\r\n", ret);
+        return ret;
+    }
     return 0;
 }
 
@@ -92,6 +107,7 @@ static int32_t b485_send(const struct device * dev,
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
 
     const struct gpio_dt_spec *dir = &cfg->dir;
+    const struct device *uart_dev = cfg->uart_dev;
 
     ret = gpio_pin_set_dt(dir, 1);
     if(ret < 0){
@@ -99,8 +115,18 @@ static int32_t b485_send(const struct device * dev,
         return ret;
     }
 
-    //send to uart;
+    uint32_t total_send = 0;
+    
+    while(total_send < count){
+        int send = uart_fifo_fill(uart_dev, &buffer[total_send], count - total_send);
+        if(send > 0){
+            total_send += send;
+        }
+    }
 
+    while(!uart_irq_tx_complete(uart_dev))
+        k_sleep(K_USEC(1));
+    
     ret = gpio_pin_set_dt(dir, 0);//may be it's call in callback
     if(ret < 0){
         LOG_ERR("Error (%d): failed to reset dir pin\r\n", ret);

@@ -38,6 +38,11 @@ int main(void){
 	}
     
     printk("PROJECT start\r\n");
+
+	const struct bus485_driver_api * b485_api = (struct bus485_driver_api*)bus->api;
+
+	uint8_t buf[3] = {0x33, 0x05A, 0x02};
+	b485_api->bus485_send(bus, buf, 3);
 	while (1) {
 		ret = gpio_pin_toggle_dt(&led);
 		if (ret < 0) {
@@ -47,6 +52,8 @@ int main(void){
 		led_state = !led_state;
 		printf("LED state: %s\n", led_state ? "ON" : "OFF");
 		k_msleep(SLEEP_TIME_MS);
+
+		b485_api->bus485_send(bus, buf, 3);
 	}
 
     return 0;

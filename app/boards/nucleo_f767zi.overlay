@@ -1,11 +1,15 @@
 
 &usart2 {
-    status="okay";
     current-speed = <115200>;
+    pinctrl-0 = <&usart2_tx_pd5 &usart2_rx_pd6>;
+    pinctrl-names= "default";
+    status="okay";
     b485: custom_bus4850 {
         compatible = "custom,bus485";
-        status="okay";
-        pin-gpios = <&gpiob 14 GPIO_ACTIVE_LOW>;
+        pin-gpios = <&gpiod 4 GPIO_ACTIVE_HIGH>;
         label="custom_bus4850";
+        status="okay";
     };
 };
+
+

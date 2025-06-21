@@ -6,6 +6,8 @@
 
 #include "bus485.h"
 
+#define CUSTOM_BUS485_INIT_PRIORITY CONFIG_CUSTOM_BUS485_INIT_PRIORITY
+
 //Enable logging
 LOG_MODULE_REGISTER(bus485);
 
@@ -65,12 +67,14 @@ static int bus485_init(const struct device * dev)
         return -ENODEV;
     }
 
+
     ret = gpio_pin_configure_dt(dir, GPIO_OUTPUT_ACTIVE);
     if(ret < 0){
         LOG_ERR("Could not configure GPIO as output\r\n");
         return -ENODEV;
     }
 
+    LOG_DBG("ACCEPT INTERRUPT FOR UART\r\n");
     uart_irq_rx_disable(uart_dev);
 	uart_irq_tx_disable(uart_dev);
     ret = uart_irq_callback_user_data_set(uart_dev, interrupt_handler, NULL);
@@ -202,8 +206,8 @@ static const struct bus485_driver_api bus485_driver_api_funcs = {
                             NULL,                               \
                             NULL,                               \
                             &bus485_config_##inst,              \
-                            POST_KERNEL,                        \
-                            CONFIG_GPIO_INIT_PRIORITY,          \
+                            POST_KERNEL,                  \
+                            CUSTOM_BUS485_INIT_PRIORITY,          \
                             &bus485_driver_api_funcs);          \
 
 

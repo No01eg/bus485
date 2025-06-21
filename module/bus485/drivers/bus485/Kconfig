@@ -4,3 +4,8 @@ config CUSTOM_BUS485
     depends on UART_INTERRUPT_DRIVEN && GPIO
     help
         Enable the custom bus485 driver.
+
+config CUSTOM_BUS485_INIT_PRIORITY
+    int "Initialization priority"
+    default 50
+    range 1 100

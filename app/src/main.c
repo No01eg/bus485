@@ -3,9 +3,8 @@
 
 #include "bus485.h"
 
-static const int32_t sleep_time_ms = 50;
 
-#define SLEEP_TIME_MS   500
+#define SLEEP_TIME_MS   5000
 
 /* The devicetree node identifier for the "led0" alias. */
 #define LED0_NODE DT_ALIAS(led0)
@@ -41,19 +40,27 @@ int main(void){
 
 	const struct bus485_driver_api * b485_api = (struct bus485_driver_api*)bus->api;
 
+	b485_api->bus485_set_baudrate(bus, 9600);
 	uint8_t buf[3] = {0x33, 0x05A, 0x02};
+	uint8_t buff[20];
 	b485_api->bus485_send(bus, buf, 3);
 	while (1) {
-		ret = gpio_pin_toggle_dt(&led);
-		if (ret < 0) {
-			return 0;
+		//ret = gpio_pin_toggle_dt(&led);
+		//if (ret < 0) {
+		//	return 0;
+		//}
+
+		//led_state = !led_state;
+		//printf("LED state: %s\n", led_state ? "ON" : "OFF");
+		k_msleep(SLEEP_TIME_MS);
+		b485_api->bus485_send(bus, buf, 3);
+		printf("wait receive\r\n\r\n\r\n");
+		ret = b485_api->bus485_recv(bus, buff, 20, 5000);
+		if(ret < 0){
+			printf("receive timeout\r\n");
 		}
 
-		led_state = !led_state;
-		printf("LED state: %s\n", led_state ? "ON" : "OFF");
-		k_msleep(SLEEP_TIME_MS);
-
-		b485_api->bus485_send(bus, buf, 3);
+		//
 	}
 
     return 0;

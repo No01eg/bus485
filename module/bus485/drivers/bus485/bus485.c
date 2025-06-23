@@ -9,12 +9,14 @@
 
 #define CUSTOM_BUS485_INIT_PRIORITY CONFIG_CUSTOM_BUS485_INIT_PRIORITY
 
+bool isWrongByteAfterSend = false;
+bool isFirstReceive = false;
 //Enable logging
 LOG_MODULE_REGISTER(bus485);
 #define QUEUE_SIZE 256
 
-//uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
-//struct k_msgq uart_rx_msgq;
+uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
+struct k_msgq uart_rx_msgq;
 //K_MSGQ_DEFINE(uart_rx_queue, sizeof(uint8_t), QUEUE_SIZE, 4);
 
 static struct device *uart_tmp;
@@ -60,7 +62,14 @@ static void interrupt_handler(const struct device *dev, void *user_data)
         if(ret <= 0)
             return;
         else{
-            //k_msgq_put(&uart_rx_msgq, buf, K_NO_WAIT);
+            if(isWrongByteAfterSend)
+            {
+                isWrongByteAfterSend = false;
+                return;
+            }
+            if(!isFirstReceive)
+                isFirstReceive = true;
+            k_msgq_put(&uart_rx_msgq, buf, K_NO_WAIT);
             //LOG_DBG("pack rcv with %d bytes\r\n", ret);
             //if(ret > 0){
              //   LOG_HEXDUMP_INF(buf, ret, "Rcv buff");   
@@ -145,7 +154,7 @@ static int bus485_init(const struct device * dev)
         LOG_ERR("Could not accept interrupt for uart (%d)\r\n", ret);
         return ret;
     }
-    //k_msgq_init(&uart_rx_msgq, uart_rx_msgq_buffer, sizeof(uint8_t), QUEUE_SIZE);
+    k_msgq_init(&uart_rx_msgq, uart_rx_msgq_buffer, sizeof(uint8_t), QUEUE_SIZE);
     //uart_irq_rx_enable(uart_dev);
 
     return 0;
@@ -196,11 +205,16 @@ static int32_t b485_send(const struct device * dev,
     while(!uart_irq_tx_complete(uart_dev))
         k_sleep(K_USEC(1));
     
+    k_sleep(K_USEC(100));
     ret = gpio_pin_set_dt(dir, 0);
     if(ret < 0){
         LOG_ERR("Error (%d): failed to reset dir pin\r\n", ret);
         return ret;
     }
+    k_sleep(K_USEC(100));
+    isWrongByteAfterSend= true;
+    //uint8_t b[1];
+    //uart_fifo_read(uart_dev, b, 1);
     //uart_irq_rx_enable(uart_dev);
     return total_send;
 }
@@ -228,12 +242,15 @@ static int32_t b485_recv(const struct device * dev,
                 break;
             } 
         }*/
-
+        if(!isFirstReceive){
+            k_sleep(K_MSEC(10));
+            continue;
+        }
         //read from queue
-        uint8_t data;
-        //k_timeout_t time_wait = K_MSES(10);
-        //ret = k_msgq_get(&uart_rx_msgq, &data, time_wait);
-        if( ret == -EAGAIN)
+        uint8_t data = 0;
+        k_timeout_t time_wait = Z_TIMEOUT_MS(15);
+        ret = k_msgq_get(&uart_rx_msgq, (uint8_t*)&data, time_wait);
+        if( ret == -EAGAIN && count > 0)
             break;
         else{
             tmpBuf[count] = data;
@@ -247,6 +264,7 @@ static int32_t b485_recv(const struct device * dev,
     if(count > 0){
        LOG_HEXDUMP_INF(buffer, count, "Rcv buff");   
     }
+    isFirstReceive = false;
     uart_irq_rx_disable(uart_dev);
     return count;
 }

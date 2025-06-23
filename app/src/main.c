@@ -54,10 +54,13 @@ int main(void){
 		//printf("LED state: %s\n", led_state ? "ON" : "OFF");
 		k_msleep(SLEEP_TIME_MS);
 		b485_api->bus485_send(bus, buf, 3);
-		printf("wait receive\r\n\r\n\r\n");
+		printk("wait receive\r\n\r\n\r\n");
 		ret = b485_api->bus485_recv(bus, buff, 20, 5000);
 		if(ret < 0){
-			printf("receive timeout\r\n");
+			printk("receive timeout\r\n");
+		}
+		else{
+			printk("receive %d bytes\r\n", ret);
 		}
 
 		//

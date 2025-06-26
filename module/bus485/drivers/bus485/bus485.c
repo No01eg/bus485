@@ -8,18 +8,20 @@
 #include "bus485.h"
 
 #define CUSTOM_BUS485_INIT_PRIORITY CONFIG_CUSTOM_BUS485_INIT_PRIORITY
+#define QUEUE_SIZE CONFIG_CUSTOM_BUS485_QUEUE_SIZE
 
 bool isWrongByteAfterSend = false;
 bool isFirstReceive = false;
 //Enable logging
 LOG_MODULE_REGISTER(bus485);
-#define QUEUE_SIZE 256
 
 uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
 struct k_msgq uart_rx_msgq;
+
+struct k_sem bus_sem;
 //K_MSGQ_DEFINE(uart_rx_queue, sizeof(uint8_t), QUEUE_SIZE, 4);
 
-static struct device *uart_tmp;
+//static struct device *uart_tmp;
 
 static int bus485_init(const struct device * dev);
 
@@ -132,8 +134,6 @@ static int bus485_init(const struct device * dev)
         return -ENODEV;
     }
 
-    uart_tmp = uart_dev;
-
     if(!gpio_is_ready_dt(dir)){
         LOG_ERR("GPIO is not ready\r\n");
         return -ENODEV;
@@ -155,6 +155,8 @@ static int bus485_init(const struct device * dev)
         return ret;
     }
     k_msgq_init(&uart_rx_msgq, uart_rx_msgq_buffer, sizeof(uint8_t), QUEUE_SIZE);
+
+    k_sem_init(&bus_sem, 0, 1);
     //uart_irq_rx_enable(uart_dev);
 
     return 0;
@@ -166,12 +168,19 @@ static int32_t b485_lock(const struct device * dev)
 {
     int ret;
 
+    ret = k_sem_take(&bus_sem, K_FOREVER);
+    if(ret < 0){
+        return ret;
+    }
+
     return 0;
 }
 
 static int32_t b485_release(const struct device * dev)
 {
     int ret;
+
+    k_sem_give(&bus_sem);
 
     return 0;
 }
@@ -211,11 +220,8 @@ static int32_t b485_send(const struct device * dev,
         LOG_ERR("Error (%d): failed to reset dir pin\r\n", ret);
         return ret;
     }
-    k_sleep(K_USEC(100));
+    k_sleep(K_MSEC(2));
     isWrongByteAfterSend= true;
-    //uint8_t b[1];
-    //uart_fifo_read(uart_dev, b, 1);
-    //uart_irq_rx_enable(uart_dev);
     return total_send;
 }
 
@@ -237,11 +243,6 @@ static int32_t b485_recv(const struct device * dev,
     while(1){
         if(count == 0 && ((k_uptime_get() - start_time) > timeout_ms)) //timeout
             return -EAGAIN;
-        /*else if(count > 0){
-            if(k_uptime_get() - start_time > 15){ //is idle 
-                break;
-            } 
-        }*/
         if(!isFirstReceive){
             k_sleep(K_MSEC(10));
             continue;
@@ -258,7 +259,6 @@ static int32_t b485_recv(const struct device * dev,
             if(count == buffer_size)
                 break;
         }
-        //start_time = k_uptime_get();
     }
     LOG_DBG("pack rcv with %d bytes\r\n", count);
     if(count > 0){
@@ -272,6 +272,12 @@ static int32_t b485_recv(const struct device * dev,
 static int32_t b485_flush(const struct device * dev)
 {
     int ret;
+
+    ret = k_msgq_cleanup(&uart_rx_msgq);
+    if(ret < 0){
+        LOG_ERR("Failed to cleanup queue (%d)\r\n", ret);
+        return ret;
+    }
 
     return 0;
 }

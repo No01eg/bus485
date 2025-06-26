@@ -9,3 +9,13 @@ config CUSTOM_BUS485_INIT_PRIORITY
     int "Initialization priority"
     default 50
     range 1 100
+
+config CUSTOM_BUS485_QUEUE_SIZE
+    int "Size of receive queue"
+    default 256
+    range 1 256
+
+config CUSTOM_BUS485_RECV_SYM_IDLE_COUNT
+    int "count symbols for wait idle status on bus"
+    default 5
+    range 3 5

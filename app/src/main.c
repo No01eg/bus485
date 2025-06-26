@@ -41,9 +41,9 @@ int main(void){
 	const struct bus485_driver_api * b485_api = (struct bus485_driver_api*)bus->api;
 
 	b485_api->bus485_set_baudrate(bus, 9600);
-	uint8_t buf[3] = {0x33, 0x05A, 0x02};
-	uint8_t buff[20];
-	b485_api->bus485_send(bus, buf, 3);
+	uint8_t buf[8] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x0a, 0xc5, 0xcd};
+	uint8_t buff[40];
+	b485_api->bus485_send(bus, buf, 8);
 	while (1) {
 		//ret = gpio_pin_toggle_dt(&led);
 		//if (ret < 0) {
@@ -53,9 +53,9 @@ int main(void){
 		//led_state = !led_state;
 		//printf("LED state: %s\n", led_state ? "ON" : "OFF");
 		k_msleep(SLEEP_TIME_MS);
-		b485_api->bus485_send(bus, buf, 3);
+		b485_api->bus485_send(bus, buf, 8);
 		printk("wait receive\r\n\r\n\r\n");
-		ret = b485_api->bus485_recv(bus, buff, 20, 5000);
+		ret = b485_api->bus485_recv(bus, buff, 40, 5000);
 		if(ret < 0){
 			printk("receive timeout\r\n");
 		}

@@ -19,9 +19,7 @@ uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
 struct k_msgq uart_rx_msgq;
 
 struct k_sem bus_sem;
-//K_MSGQ_DEFINE(uart_rx_queue, sizeof(uint8_t), QUEUE_SIZE, 4);
 
-//static struct device *uart_tmp;
 
 static int bus485_init(const struct device * dev);
 
@@ -53,8 +51,6 @@ static void interrupt_handler(const struct device *dev, void *user_data)
 
     int ret;
 
-    
-#if 1
     while(uart_irq_update(uart_td) > 0 && uart_irq_is_pending(uart_td)){
         ret = uart_irq_rx_ready(uart_td);
         if(ret < 0)
@@ -72,48 +68,8 @@ static void interrupt_handler(const struct device *dev, void *user_data)
             if(!isFirstReceive)
                 isFirstReceive = true;
             k_msgq_put(&uart_rx_msgq, buf, K_NO_WAIT);
-            //LOG_DBG("pack rcv with %d bytes\r\n", ret);
-            //if(ret > 0){
-             //   LOG_HEXDUMP_INF(buf, ret, "Rcv buff");   
-            //}
         }
     }
-#else
-    if(!uart_irq_update(uart_t))
-        return;
-
-    if(!uart_irq_is_pending(uart_t))
-        return;
-    uint8_t count_wait = 0;
-    int rx = uart_irq_rx_ready(uart_t);
-    if(rx < 0)
-        return;
-    if(rx == 0)
-        return;
-
-        uint32_t total_rcv = 0;
-        uint32_t counter = 0;
-        //while(total_rcv < 256){
-            uint8_t tmp[4];
-            int recv_len = uart_fifo_read(uart_t, tmp, 4);
-            if(recv_len > 0){
-                LOG_DBG("pack rcv with %d bytes\r\n", total_rcv);
-                if(total_rcv > 0){
-                    LOG_HEXDUMP_INF(buf, total_rcv, "Rcv buff");   
-                }
-            }
-
-        //}
-#endif
-    /*while(uart_irq_update(dev) && uart_irq_is_pending(dev)){
-        if(uart_irq_rx_ready(dev)){
-            int recv_len = uart_fifo_read(dev, buf, 256);
-            LOG_DBG("pack rcv with %d bytes\r\n", recv_len);
-            if(recv_len > 0){
-                LOG_HEXDUMP_INF(buf, recv_len, "Rcv buff");
-            }
-        }
-    }*/
 }
 
 static int bus485_init(const struct device * dev)
@@ -128,8 +84,8 @@ static int bus485_init(const struct device * dev)
     const struct device *uart_dev = cfg->uart_dev;
     LOG_DBG("Initializing bus485 (instance ID: %u)\r\n", cfg->id);
 
-    //if (!device_is_ready(uart_dev)){
-    if(!uart_dev){
+    if (!device_is_ready(uart_dev)){
+    //if(!uart_dev){
         LOG_ERR("UART is not found\r\n");
         return -ENODEV;
     }
@@ -157,7 +113,6 @@ static int bus485_init(const struct device * dev)
     k_msgq_init(&uart_rx_msgq, uart_rx_msgq_buffer, sizeof(uint8_t), QUEUE_SIZE);
 
     k_sem_init(&bus_sem, 0, 1);
-    //uart_irq_rx_enable(uart_dev);
 
     return 0;
 }

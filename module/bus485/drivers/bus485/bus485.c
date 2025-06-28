@@ -9,9 +9,14 @@
 
 #define CUSTOM_BUS485_INIT_PRIORITY CONFIG_CUSTOM_BUS485_INIT_PRIORITY
 #define QUEUE_SIZE CONFIG_CUSTOM_BUS485_QUEUE_SIZE
+#define SYM_COUNT_IDLE CONFIG_CUSTOM_BUS485_RECV_SYM_IDLE_COUNT
 
+#define BITS_IN_SYM 10
+
+#define READ_ONE_BYTE_AFTER_WRITE
 bool isWrongByteAfterSend = false;
 bool isFirstReceive = false;
+uint32_t us_per_sym = 1;
 //Enable logging
 LOG_MODULE_REGISTER(bus485);
 
@@ -78,25 +83,24 @@ static int bus485_init(const struct device * dev)
 
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
 
-    const struct gpio_dt_spec *dir = &cfg->dir;
+    const struct gpio_dt_spec *data_enable = &cfg->data_enable;
 
     
     const struct device *uart_dev = cfg->uart_dev;
     LOG_DBG("Initializing bus485 (instance ID: %u)\r\n", cfg->id);
 
     if (!device_is_ready(uart_dev)){
-    //if(!uart_dev){
         LOG_ERR("UART is not found\r\n");
         return -ENODEV;
     }
 
-    if(!gpio_is_ready_dt(dir)){
+    if(!gpio_is_ready_dt(data_enable)){
         LOG_ERR("GPIO is not ready\r\n");
         return -ENODEV;
     }
 
 
-    ret = gpio_pin_configure_dt(dir, GPIO_OUTPUT_ACTIVE);
+    ret = gpio_pin_configure_dt(data_enable, GPIO_OUTPUT_ACTIVE);
     if(ret < 0){
         LOG_ERR("Could not configure GPIO as output\r\n");
         return -ENODEV;
@@ -112,7 +116,7 @@ static int bus485_init(const struct device * dev)
     }
     k_msgq_init(&uart_rx_msgq, uart_rx_msgq_buffer, sizeof(uint8_t), QUEUE_SIZE);
 
-    k_sem_init(&bus_sem, 0, 1);
+    k_sem_init(&bus_sem, 1, 1);
 
     return 0;
 }
@@ -148,12 +152,12 @@ static int32_t b485_send(const struct device * dev,
 
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
 
-    const struct gpio_dt_spec *dir = &cfg->dir;
     const struct device *uart_dev = cfg->uart_dev;
+    const struct gpio_dt_spec *data_enable = &cfg->data_enable;
 
-    ret = gpio_pin_set_dt(dir, 1);
+    ret = gpio_pin_set_dt(data_enable, 1);
     if(ret < 0){
-        LOG_ERR("Error (%d): failed to set dir pin\r\n", ret);
+        LOG_ERR("Error (%d): failed to set data_enable pin\r\n", ret);
         return ret;
     }
 
@@ -169,14 +173,16 @@ static int32_t b485_send(const struct device * dev,
     while(!uart_irq_tx_complete(uart_dev))
         k_sleep(K_USEC(1));
     
-    k_sleep(K_USEC(100));
-    ret = gpio_pin_set_dt(dir, 0);
+    //k_sleep(K_USEC(100));
+    ret = gpio_pin_set_dt(data_enable, 0);
     if(ret < 0){
-        LOG_ERR("Error (%d): failed to reset dir pin\r\n", ret);
+        LOG_ERR("Error (%d): failed to reset data_enable pin\r\n", ret);
         return ret;
     }
-    k_sleep(K_MSEC(2));
+    k_sleep(K_MSEC(8));
+    #if defined(READ_ONE_BYTE_AFTER_WRITE)
     isWrongByteAfterSend= true;
+    #endif
     return total_send;
 }
 
@@ -204,7 +210,7 @@ static int32_t b485_recv(const struct device * dev,
         }
         //read from queue
         uint8_t data = 0;
-        k_timeout_t time_wait = Z_TIMEOUT_MS(15);
+        k_timeout_t time_wait = Z_TIMEOUT_US(us_per_sym * SYM_COUNT_IDLE);
         ret = k_msgq_get(&uart_rx_msgq, (uint8_t*)&data, time_wait);
         if( ret == -EAGAIN && count > 0)
             break;
@@ -248,6 +254,8 @@ static int32_t b485_set_baudrate(const struct device * dev,
 
     const struct device * uart = cfg->uart_dev;
 
+    us_per_sym = BITS_IN_SYM * 1000000 / baudrate; 
+
     ret = uart_config_get(uart, &config);
     if(ret < 0){
         LOG_ERR("Error (%d): failed to read uart param\r\n");
@@ -278,7 +286,7 @@ static const struct bus485_driver_api bus485_driver_api_funcs = {
 //macro to define driver instance
 #define BUS485_DEFINE(inst)\
     static const struct bus485_config bus485_config_##inst = {      \
-        .dir = GPIO_DT_SPEC_INST_GET(inst, pin_gpios),  \
+        .data_enable = GPIO_DT_SPEC_INST_GET(inst, pin_gpios),  \
         .uart_dev = DEVICE_DT_GET(DT_INST_BUS(inst)),\
         .id = inst                                                              \
     };          \

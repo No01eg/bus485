@@ -27,7 +27,7 @@ struct bus485_driver_api {
 
 //configuration
 struct bus485_config {
-    const struct gpio_dt_spec dir;
+    const struct gpio_dt_spec data_enable;
     const struct device * uart_dev;
     uint32_t id;
 };

@@ -1,59 +1,121 @@
 #include <stdio.h>
 #include <zephyr/kernel.h>
 
+
+#include <zephyr/logging/log.h>
 #include "bus485.h"
 
 
-#define SLEEP_TIME_MS   5000
+//Stack size set
+#define TH1_THREAD_STACK_SIZE 512
+
+K_THREAD_STACK_DEFINE(th1_stack, TH1_THREAD_STACK_SIZE);
+static struct k_thread th1_thread;
+
+static const struct device * bus = DEVICE_DT_GET(DT_NODELABEL(b485));
+
+void th1_thread_start(void *arg_1, void *arg_2, void *arg_3){
+	int ret;
+	uint8_t buf_req[8] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x0a, 0xc5, 0xcd};
+	uint8_t buff_resp[40];
+	const struct bus485_driver_api * b485_api = (struct bus485_driver_api*)bus->api;
+
+	while(1){
+		b485_api->bus485_lock(bus);
+		b485_api->bus485_set_baudrate(bus, 9600);
+		b485_api->bus485_flush(bus);
+		b485_api->bus485_send(bus, buf_req, 8);
+		printk("wait receive\r\n\r\n\r\n");
+		ret = b485_api->bus485_recv(bus, buff_resp, 40, 5000);
+		if(ret < 0){
+			printk("receive timeout\r\n");
+		}
+		else{
+			printk("\r\npack rcv with %d bytes: ", ret);
+			if(ret > 0){
+				uint8_t i;
+				for(i = 0; i < ret; ++i)
+					printk("%#2x ", buff_resp[i]);
+				printk("\r\n");
+				//LOG_HEXDUMP_INF(buff_resp, ret, "Rcv buff");   
+			}
+		}
+
+		b485_api->bus485_release(bus);
+
+		k_msleep(1000);
+	}
+}
 
 /* The devicetree node identifier for the "led0" alias. */
-#define LED0_NODE DT_ALIAS(led0)
 
 /*
  * A build error on this line means your board is unsupported.
  * See the sample documentation for information on how to fix this.
  */
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
-static const struct device * bus = DEVICE_DT_GET(DT_NODELABEL(b485));
 
 
 int main(void){
     int ret;
+	k_tid_t th1_tid;
     if(!device_is_ready(bus)){
         printk("Error: bus are not ready\r\n");
         return -ENODEV;
     }
     
-    bool led_state = true;
-    
-	if (!gpio_is_ready_dt(&led)) {
-        return 0;
-	}
-    
-	ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
-	if (ret < 0) {
-        return 0;
-	}
     
     printk("PROJECT start\r\n");
-
+#if 1
+	th1_tid = k_thread_create(&th1_thread,
+							  th1_stack,
+							  K_THREAD_STACK_SIZEOF(th1_stack),
+							  th1_thread_start,
+							  NULL,
+							  NULL,
+							  NULL,
+							  7, 
+							  0,
+							  K_NO_WAIT);
+	
+	while(1){
+		k_msleep(2000);
+	}
+	#endif
+	#if 0
 	const struct bus485_driver_api * b485_api = (struct bus485_driver_api*)bus->api;
 
 	b485_api->bus485_set_baudrate(bus, 9600);
-	uint8_t buf[8] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x0a, 0xc5, 0xcd};
-	uint8_t buff[40];
-	b485_api->bus485_send(bus, buf, 8);
+	uint8_t buf_req[8] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x0a, 0xc5, 0xcd};
+	uint8_t buff_resp[40];
+	//b485_api->bus485_send(bus, buf, 8);
 	while (1) {
-		//ret = gpio_pin_toggle_dt(&led);
-		//if (ret < 0) {
-		//	return 0;
-		//}
 
-		//led_state = !led_state;
-		//printf("LED state: %s\n", led_state ? "ON" : "OFF");
-		k_msleep(SLEEP_TIME_MS);
-		b485_api->bus485_send(bus, buf, 8);
+		k_msleep(2000);
+
+		b485_api->bus485_lock(bus);
+		b485_api->bus485_set_baudrate(bus, 9600);
+		b485_api->bus485_flush(bus);
+		b485_api->bus485_send(bus, buf_req, 8);
+		printk("wait receive\r\n\r\n\r\n");
+		ret = b485_api->bus485_recv(bus, buff_resp, 40, 5000);
+		if(ret < 0){
+			printk("receive timeout\r\n");
+		}
+		else{
+			printk("\r\npack rcv with %d bytes: ", ret);
+			if(ret > 0){
+				uint8_t i;
+				for(i = 0; i < ret; ++i)
+					printk("%#2x ", buff_resp[i]);
+				printk("\r\n");
+				//LOG_HEXDUMP_INF(buff_resp, ret, "Rcv buff");   
+			}
+		}
+
+		b485_api->bus485_release(bus);
+
+		/*b485_api->bus485_send(bus, buf, 8);
 		printk("wait receive\r\n\r\n\r\n");
 		ret = b485_api->bus485_recv(bus, buff, 40, 5000);
 		if(ret < 0){
@@ -61,10 +123,11 @@ int main(void){
 		}
 		else{
 			printk("receive %d bytes\r\n", ret);
-		}
+		}*/
 
 		//
 	}
+	#endif
 
     return 0;
 }

@@ -4,12 +4,17 @@
 #include <errno.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
+#include <zephyr/devicetree.h>
 
 #include "bus485.h"
 
 #define CUSTOM_BUS485_INIT_PRIORITY CONFIG_CUSTOM_BUS485_INIT_PRIORITY
 #define QUEUE_SIZE CONFIG_CUSTOM_BUS485_QUEUE_SIZE
 #define SYM_COUNT_IDLE CONFIG_CUSTOM_BUS485_RECV_SYM_IDLE_COUNT
+
+#if DT_NODE_HAS_PROP(DT_NODELABEL(bus485), pin-gpios)
+#define DATA_ENABLE_ACTIVE
+#endif
 
 #define BITS_IN_SYM 10
 
@@ -93,7 +98,7 @@ static int bus485_init(const struct device * dev)
         LOG_ERR("UART is not found\r\n");
         return -ENODEV;
     }
-
+#ifdef DATA_ENABLE_ACTIVE
     if(!gpio_is_ready_dt(data_enable)){
         LOG_ERR("GPIO is not ready\r\n");
         return -ENODEV;
@@ -105,6 +110,7 @@ static int bus485_init(const struct device * dev)
         LOG_ERR("Could not configure GPIO as output\r\n");
         return -ENODEV;
     }
+#endif
 
     LOG_DBG("ACCEPT INTERRUPT FOR UART\r\n");
     uart_irq_rx_disable(uart_dev);
@@ -153,6 +159,7 @@ static int32_t b485_send(const struct device * dev,
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
 
     const struct device *uart_dev = cfg->uart_dev;
+#ifdef DATA_ENABLE_ACTIVE
     const struct gpio_dt_spec *data_enable = &cfg->data_enable;
 
     ret = gpio_pin_set_dt(data_enable, 1);
@@ -160,6 +167,7 @@ static int32_t b485_send(const struct device * dev,
         LOG_ERR("Error (%d): failed to set data_enable pin\r\n", ret);
         return ret;
     }
+#endif
 
     uint32_t total_send = 0;
     
@@ -172,7 +180,7 @@ static int32_t b485_send(const struct device * dev,
 
     while(!uart_irq_tx_complete(uart_dev))
         k_sleep(K_USEC(1));
-    
+#ifdef DATA_ENABLE_ACTIVE    
     //k_sleep(K_USEC(100));
     ret = gpio_pin_set_dt(data_enable, 0);
     if(ret < 0){
@@ -183,6 +191,7 @@ static int32_t b485_send(const struct device * dev,
     #if defined(READ_ONE_BYTE_AFTER_WRITE)
     isWrongByteAfterSend= true;
     #endif
+#endif
     return total_send;
 }
 

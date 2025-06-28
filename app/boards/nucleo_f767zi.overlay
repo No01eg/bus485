@@ -4,10 +4,10 @@
     pinctrl-0 = <&usart2_tx_pd5 &usart2_rx_pd6>;
     pinctrl-names= "default";
     status="okay";
-    b485: custom_bus4850 {
+    b485: bus485 {
         compatible = "custom,bus485";
         pin-gpios = <&gpiod 4 GPIO_ACTIVE_HIGH>;
-        label="custom_bus4850";
+        label="bus485";
         status="okay";
     };
 };

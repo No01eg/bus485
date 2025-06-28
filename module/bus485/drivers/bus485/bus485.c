@@ -13,14 +13,22 @@
 #define SYM_COUNT_IDLE CONFIG_CUSTOM_BUS485_RECV_SYM_IDLE_COUNT
 
 #if DT_NODE_HAS_PROP(DT_NODELABEL(bus485), pin-gpios)
+//#if CONFIG_CUSTOM_BUS485_DE_ACTIVE
 #define DATA_ENABLE_ACTIVE
 #endif
+
+
 
 #define BITS_IN_SYM 10
 
 #define READ_ONE_BYTE_AFTER_WRITE
 bool isWrongByteAfterSend = false;
 bool isFirstReceive = false;
+#if CONFIG_CUSTOM_BUS485_DE_ACTIVE
+bool is_use_data_enable = true;
+#else
+bool is_use_data_enable = false;
+#endif
 uint32_t us_per_sym = 1;
 //Enable logging
 LOG_MODULE_REGISTER(bus485);
@@ -87,6 +95,12 @@ static int bus485_init(const struct device * dev)
     int ret;
 
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
+    
+    /*if(DT_NODE_HAS_PROP(DT_NODELABEL(b485), pin_gpios)){
+        is_use_data_enable = true;
+    }
+    else
+        is_use_data_enable = false;*/
 
     const struct gpio_dt_spec *data_enable = &cfg->data_enable;
 
@@ -98,7 +112,8 @@ static int bus485_init(const struct device * dev)
         LOG_ERR("UART is not found\r\n");
         return -ENODEV;
     }
-#ifdef DATA_ENABLE_ACTIVE
+if(is_use_data_enable){
+    LOG_DBG("ACTIVATE GPIO DATA_ENABLE\r\n");
     if(!gpio_is_ready_dt(data_enable)){
         LOG_ERR("GPIO is not ready\r\n");
         return -ENODEV;
@@ -110,9 +125,8 @@ static int bus485_init(const struct device * dev)
         LOG_ERR("Could not configure GPIO as output\r\n");
         return -ENODEV;
     }
-#endif
+}
 
-    LOG_DBG("ACCEPT INTERRUPT FOR UART\r\n");
     uart_irq_rx_disable(uart_dev);
 	uart_irq_tx_disable(uart_dev);
     ret = uart_irq_callback_user_data_set(uart_dev, interrupt_handler, (void*)uart_dev);
@@ -159,15 +173,15 @@ static int32_t b485_send(const struct device * dev,
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
 
     const struct device *uart_dev = cfg->uart_dev;
-#ifdef DATA_ENABLE_ACTIVE
     const struct gpio_dt_spec *data_enable = &cfg->data_enable;
+if(is_use_data_enable){
 
     ret = gpio_pin_set_dt(data_enable, 1);
     if(ret < 0){
         LOG_ERR("Error (%d): failed to set data_enable pin\r\n", ret);
         return ret;
     }
-#endif
+}
 
     uint32_t total_send = 0;
     
@@ -180,7 +194,7 @@ static int32_t b485_send(const struct device * dev,
 
     while(!uart_irq_tx_complete(uart_dev))
         k_sleep(K_USEC(1));
-#ifdef DATA_ENABLE_ACTIVE    
+if(is_use_data_enable){  
     //k_sleep(K_USEC(100));
     ret = gpio_pin_set_dt(data_enable, 0);
     if(ret < 0){
@@ -191,7 +205,7 @@ static int32_t b485_send(const struct device * dev,
     #if defined(READ_ONE_BYTE_AFTER_WRITE)
     isWrongByteAfterSend= true;
     #endif
-#endif
+}
     return total_send;
 }
 

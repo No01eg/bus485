@@ -19,3 +19,7 @@ config CUSTOM_BUS485_RECV_SYM_IDLE_COUNT
     int "count symbols for wait idle status on bus"
     default 5
     range 3 5
+
+config CUSTOM_BUS485_DE_ACTIVE
+    bool "use pin data_enable"
+    default y

@@ -5,7 +5,7 @@
 #include <zephyr/logging/log.h>
 #include "bus485.h"
 
-
+LOG_MODULE_REGISTER(app);
 //Stack size set
 #define TH1_THREAD_STACK_SIZE 512
 #define TH2_THREAD_STACK_SIZE 512
@@ -30,18 +30,16 @@ void th1_thread_start(void *arg_1, void *arg_2, void *arg_3){
 		b485_api->bus485_set_baudrate(bus, 9600);
 		b485_api->bus485_flush(bus);
 		b485_api->bus485_send(bus, buf_req, 8);
-		printk("wait receive\r\n\r\n\r\n");
+		LOG_DBG("TH1 WAIT ANSWER\r\n");
 		ret = b485_api->bus485_recv(bus, buff_resp, 40, 5000);
 		if(ret < 0){
-			printk("receive timeout\r\n");
+			LOG_DBG("TH1 receive timeout\r\n");
 		}
 		else{
-			printk("\r\npack rcv with %d bytes: ", ret);
+
+			LOG_DBG("TH1 pack rcv with %d bytes\r\n", ret);
 			if(ret > 0){
-				uint8_t i;
-				for(i = 0; i < ret; ++i)
-					printk("%#2x ", buff_resp[i]);
-				printk("\r\n");
+				LOG_HEXDUMP_INF(buff_resp, ret, "Rcv buff");   
 			}
 		}
 
@@ -53,7 +51,7 @@ void th1_thread_start(void *arg_1, void *arg_2, void *arg_3){
 
 void th2_thread_start(void *arg_1, void *arg_2, void *arg_3){
 	int ret;
-	uint8_t buf_req[8] = {0x02, 0x01, 0x00, 0x00, 0x00, 0x0a, 0xc5, 0xcd};
+	uint8_t buf_req[8] = {0x02, 0x01, 0x00, 0x00, 0x00, 0x0a, 0xbc, 0x3e};
 	uint8_t buff_resp[40];
 	const struct bus485_driver_api * b485_api = (struct bus485_driver_api*)bus->api;
 
@@ -62,18 +60,15 @@ void th2_thread_start(void *arg_1, void *arg_2, void *arg_3){
 		b485_api->bus485_set_baudrate(bus, 9600);
 		b485_api->bus485_flush(bus);
 		b485_api->bus485_send(bus, buf_req, 8);
-		printk("wait receive\r\n\r\n\r\n");
+		LOG_DBG("TH2 WAIT ANSWER\r\n");
 		ret = b485_api->bus485_recv(bus, buff_resp, 40, 5000);
 		if(ret < 0){
-			printk("receive timeout\r\n");
+			LOG_DBG("TH2 receive timeout\r\n");
 		}
 		else{
-			printk("\r\npack rcv with %d bytes: ", ret);
+			LOG_DBG("TH2 pack rcv with %d bytes\r\n", ret);
 			if(ret > 0){
-				uint8_t i;
-				for(i = 0; i < ret; ++i)
-					printk("%#2x ", buff_resp[i]);
-				printk("\r\n");
+				LOG_HEXDUMP_INF(buff_resp, ret, "Rcv buff");   
 			}
 		}
 

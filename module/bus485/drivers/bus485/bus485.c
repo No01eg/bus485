@@ -198,7 +198,6 @@ if(is_use_data_enable){
     while(!uart_irq_tx_complete(uart_dev))
         k_sleep(K_USEC(1));
 if(is_use_data_enable){  
-    //k_sleep(K_USEC(100));
     ret = gpio_pin_set_dt(data_enable, 0);
     if(ret < 0){
         LOG_ERR("Error (%d): failed to reset data_enable pin\r\n", ret);
@@ -227,6 +226,35 @@ static int32_t b485_recv(const struct device * dev,
     
     uart_irq_rx_enable(uart_dev);
     uint8_t *tmpBuf = buffer;
+    #if 1
+        uint8_t data = 0; 
+        k_timeout_t time_wait = Z_TIMEOUT_MS(timeout_ms);
+        ret = k_msgq_get(&uart_rx_msgq, (uint8_t*)&data, time_wait);
+        if(ret < 0){//break on timeout
+            isFirstReceive = false;
+            uart_irq_rx_disable(uart_dev);
+            return ret;
+        }
+        else{
+            tmpBuf[count] = data;
+            count++;
+        }
+
+        time_wait = Z_TIMEOUT_US(us_per_sym * SYM_COUNT_IDLE);
+
+        while(1){
+            ret = k_msgq_get(&uart_rx_msgq, (uint8_t*)&data, time_wait);
+            if( ret == -EAGAIN)//check idle 
+                break;
+            else{
+                tmpBuf[count] = data;
+                count++;
+                if(count == buffer_size)
+                    break;
+            }
+        }
+
+    #else
     while(1){
         if(count == 0 && ((k_uptime_get() - start_time) > timeout_ms)) //timeout
             return -EAGAIN;
@@ -247,6 +275,7 @@ static int32_t b485_recv(const struct device * dev,
                 break;
         }
     }
+    #endif
     LOG_DBG("pack rcv with %d bytes\r\n", count);
     if(count > 0){
        LOG_HEXDUMP_INF(buffer, count, "Rcv buff");   

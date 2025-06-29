@@ -233,7 +233,7 @@ static int32_t b485_recv(const struct device * dev,
         if(ret < 0){//break on timeout
             isFirstReceive = false;
             uart_irq_rx_disable(uart_dev);
-            return ret;
+            return -EAGAIN;
         }
         else{
             tmpBuf[count] = data;

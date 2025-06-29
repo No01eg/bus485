@@ -3,6 +3,6 @@ manifest:
 
   projects:
     - name: bus485
-      url: 
+      url: https://github.com/No01eg/bus485.git
       path: modules/bus485
       revision: main

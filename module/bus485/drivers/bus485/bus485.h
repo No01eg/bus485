@@ -4,6 +4,8 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/uart.h>
 
+#define QUEUE_SIZE CONFIG_CUSTOM_BUS485_QUEUE_SIZE
+
 //predefined api
 struct bus485_driver_api {
     int32_t (*bus485_lock)(const struct device * dev);
@@ -30,6 +32,9 @@ struct bus485_config {
     const struct gpio_dt_spec data_enable;
     const struct device * uart_dev;
     uint32_t id;
+    uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
+    struct k_msgq uart_rx_msgq;
+    struct k_sem bus_sem;
 };
 
 #endif /* ZEPHYR_DRIVERS_BUS485_H_ */

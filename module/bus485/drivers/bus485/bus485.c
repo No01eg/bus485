@@ -9,7 +9,7 @@
 #include "bus485.h"
 
 #define CUSTOM_BUS485_INIT_PRIORITY CONFIG_CUSTOM_BUS485_INIT_PRIORITY
-#define QUEUE_SIZE CONFIG_CUSTOM_BUS485_QUEUE_SIZE
+
 #define SYM_COUNT_IDLE CONFIG_CUSTOM_BUS485_RECV_SYM_IDLE_COUNT
 
 #if 0
@@ -36,11 +36,11 @@ uint32_t us_per_sym = 1;
 //Enable logging
 LOG_MODULE_REGISTER(bus485);
 
-uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
+/*uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
 struct k_msgq uart_rx_msgq;
 
 struct k_sem bus_sem;
-
+*/
 
 static int bus485_init(const struct device * dev);
 
@@ -67,7 +67,8 @@ static int32_t b485_set_baudrate(const struct device * dev,
 static void interrupt_handler(const struct device *dev, void *user_data)
 {
     //ARG_UNUSED(user_data);
-    const struct device *uart_td = (struct device*)user_data;
+    const struct bus485_config *cfg = (const struct bus485_config*)user_data;
+    const struct device *uart_td = cfg->uart_dev;//(struct device*)user_data;
     uint8_t buf[1];
 
     int ret;
@@ -88,7 +89,7 @@ static void interrupt_handler(const struct device *dev, void *user_data)
             }
             if(!isFirstReceive)
                 isFirstReceive = true;
-            k_msgq_put(&uart_rx_msgq, buf, K_NO_WAIT);
+            k_msgq_put(&cfg->uart_rx_msgq, buf, K_NO_WAIT);
         }
     }
 }
@@ -132,14 +133,14 @@ if(is_use_data_enable){
 
     uart_irq_rx_disable(uart_dev);
 	uart_irq_tx_disable(uart_dev);
-    ret = uart_irq_callback_user_data_set(uart_dev, interrupt_handler, (void*)uart_dev);
+    ret = uart_irq_callback_user_data_set(uart_dev, interrupt_handler, (void*)cfg);
     if(ret < 0){
         LOG_ERR("Could not accept interrupt for uart (%d)\r\n", ret);
         return ret;
     }
-    k_msgq_init(&uart_rx_msgq, uart_rx_msgq_buffer, sizeof(uint8_t), QUEUE_SIZE);
+    k_msgq_init(&cfg->uart_rx_msgq, cfg->uart_rx_msgq_buffer, sizeof(uint8_t), QUEUE_SIZE);
 
-    k_sem_init(&bus_sem, 1, 1);
+    k_sem_init(&cfg->bus_sem, 1, 1);
 
     return 0;
 }
@@ -149,8 +150,9 @@ if(is_use_data_enable){
 static int32_t b485_lock(const struct device * dev)
 {
     int ret;
+    const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
 
-    ret = k_sem_take(&bus_sem, K_FOREVER);
+    ret = k_sem_take(&cfg->bus_sem, K_FOREVER);
     if(ret < 0){
         return ret;
     }
@@ -161,8 +163,9 @@ static int32_t b485_lock(const struct device * dev)
 static int32_t b485_release(const struct device * dev)
 {
     int ret;
+    const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
 
-    k_sem_give(&bus_sem);
+    k_sem_give(&cfg->bus_sem);
 
     return 0;
 }
@@ -203,7 +206,7 @@ if(is_use_data_enable){
         LOG_ERR("Error (%d): failed to reset data_enable pin\r\n", ret);
         return ret;
     }
-    k_sleep(K_MSEC(8));
+    k_sleep(K_MSEC(1));
     #if defined(READ_ONE_BYTE_AFTER_WRITE)
     isWrongByteAfterSend= true;
     #endif
@@ -229,7 +232,7 @@ static int32_t b485_recv(const struct device * dev,
     #if 1
         uint8_t data = 0; 
         k_timeout_t time_wait = Z_TIMEOUT_MS(timeout_ms);
-        ret = k_msgq_get(&uart_rx_msgq, (uint8_t*)&data, time_wait);
+        ret = k_msgq_get(&cfg->uart_rx_msgq, (uint8_t*)&data, time_wait);
         if(ret < 0){//break on timeout
             isFirstReceive = false;
             uart_irq_rx_disable(uart_dev);
@@ -243,7 +246,7 @@ static int32_t b485_recv(const struct device * dev,
         time_wait = Z_TIMEOUT_US(us_per_sym * SYM_COUNT_IDLE);
 
         while(1){
-            ret = k_msgq_get(&uart_rx_msgq, (uint8_t*)&data, time_wait);
+            ret = k_msgq_get(&cfg->uart_rx_msgq, (uint8_t*)&data, time_wait);
             if( ret == -EAGAIN)//check idle 
                 break;
             else{
@@ -288,8 +291,8 @@ static int32_t b485_recv(const struct device * dev,
 static int32_t b485_flush(const struct device * dev)
 {
     int ret;
-
-    ret = k_msgq_cleanup(&uart_rx_msgq);
+    const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
+    ret = k_msgq_cleanup(&cfg->uart_rx_msgq);
     if(ret < 0){
         LOG_ERR("Failed to cleanup queue (%d)\r\n", ret);
         return ret;
@@ -340,7 +343,7 @@ static const struct bus485_driver_api bus485_driver_api_funcs = {
 
 //macro to define driver instance
 #define BUS485_DEFINE(inst)\
-    static const struct bus485_config bus485_config_##inst = {      \
+    static struct bus485_config bus485_config_##inst = {      \
         .data_enable = GPIO_DT_SPEC_INST_GET(inst, pin_gpios),  \
         .uart_dev = DEVICE_DT_GET(DT_INST_BUS(inst)),\
         .id = inst                                                              \

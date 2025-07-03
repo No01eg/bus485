@@ -12,35 +12,31 @@
 
 #define SYM_COUNT_IDLE CONFIG_CUSTOM_BUS485_RECV_SYM_IDLE_COUNT
 
-#if 0
-#if DT_NODE_HAS_PROP(DT_NODELABEL(bus485), pin-gpios)
-#define DATA_ENABLE_ACTIVE
-#endif
-#endif
 
 
-#define BITS_IN_SYM 10
+#define BITS_IN_SYM 10 // 1 start bit, 8 data bits, no parity, 1 stop bit (8n1 format )
 
-#if CONFIG_CUSTOM_BUS485_CORRECTION_READ_AFTER_WRITE
-#define READ_ONE_BYTE_AFTER_WRITE
-#endif
 
-bool isWrongByteAfterSend = false;
-bool isFirstReceive = false;
-#if CONFIG_CUSTOM_BUS485_DE_ACTIVE
-bool is_use_data_enable = true;
-#else
-bool is_use_data_enable = false;
-#endif
-uint32_t us_per_sym = 1;
+
 //Enable logging
 LOG_MODULE_REGISTER(bus485);
 
-/*uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
-struct k_msgq uart_rx_msgq;
+struct bus_data{
+    uint32_t us_per_sym;
+    bool is_use_data_enable;
+};
 
-struct k_sem bus_sem;
-*/
+//configuration
+struct bus485_config {
+    const struct gpio_dt_spec data_enable;
+    const struct device * uart_dev;
+    struct bus_data *data;
+    uint32_t id;
+    uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
+    struct k_msgq uart_rx_msgq;
+    struct k_sem bus_sem;
+};
+
 
 static int bus485_init(const struct device * dev);
 
@@ -66,9 +62,8 @@ static int32_t b485_set_baudrate(const struct device * dev,
 
 static void interrupt_handler(const struct device *dev, void *user_data)
 {
-    //ARG_UNUSED(user_data);
     const struct bus485_config *cfg = (const struct bus485_config*)user_data;
-    const struct device *uart_td = cfg->uart_dev;//(struct device*)user_data;
+    const struct device *uart_td = cfg->uart_dev;
     uint8_t buf[1];
 
     int ret;
@@ -82,13 +77,6 @@ static void interrupt_handler(const struct device *dev, void *user_data)
         if(ret <= 0)
             return;
         else{
-            if(isWrongByteAfterSend)
-            {
-                isWrongByteAfterSend = false;
-                return;
-            }
-            if(!isFirstReceive)
-                isFirstReceive = true;
             k_msgq_put(&cfg->uart_rx_msgq, buf, K_NO_WAIT);
         }
     }
@@ -99,37 +87,36 @@ static int bus485_init(const struct device * dev)
     int ret;
 
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
-    
-    /*if(DT_NODE_HAS_PROP(DT_NODELABEL(b485), pin_gpios)){
-        is_use_data_enable = true;
-    }
-    else
-        is_use_data_enable = false;*/
 
     const struct gpio_dt_spec *data_enable = &cfg->data_enable;
 
     
     const struct device *uart_dev = cfg->uart_dev;
+
+    struct bus_data *bus_dat = (const struct bus_data*)dev->data;
+    #if CONFIG_CUSTOM_BUS485_DE_ACTIVE
+    bus_dat->is_use_data_enable = true;
+    #else
+    bus_dat->is_use_data_enable = false;
+    #endif
     LOG_DBG("Initializing bus485 (instance ID: %u)\r\n", cfg->id);
 
     if (!device_is_ready(uart_dev)){
         LOG_ERR("UART is not found\r\n");
         return -ENODEV;
     }
-if(is_use_data_enable){
-    LOG_DBG("ACTIVATE GPIO DATA_ENABLE\r\n");
-    if(!gpio_is_ready_dt(data_enable)){
-        LOG_ERR("GPIO is not ready\r\n");
-        return -ENODEV;
-    }
+    if(bus_dat->is_use_data_enable){
+        if(!gpio_is_ready_dt(data_enable)){
+            LOG_ERR("GPIO is not ready\r\n");
+            return -ENODEV;
+        }
 
-
-    ret = gpio_pin_configure_dt(data_enable, GPIO_OUTPUT_ACTIVE);
-    if(ret < 0){
-        LOG_ERR("Could not configure GPIO as output\r\n");
-        return -ENODEV;
+        ret = gpio_pin_configure_dt(data_enable, GPIO_OUTPUT_ACTIVE);
+        if(ret < 0){
+            LOG_ERR("Could not configure GPIO as output\r\n");
+            return -ENODEV;
+        }
     }
-}
 
     uart_irq_rx_disable(uart_dev);
 	uart_irq_tx_disable(uart_dev);
@@ -177,17 +164,16 @@ static int32_t b485_send(const struct device * dev,
     int ret;
 
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
-
+    const struct bus_data *bus_dat = (const struct bus_data*)dev->data;
     const struct device *uart_dev = cfg->uart_dev;
     const struct gpio_dt_spec *data_enable = &cfg->data_enable;
-if(is_use_data_enable){
-
-    ret = gpio_pin_set_dt(data_enable, 1);
-    if(ret < 0){
-        LOG_ERR("Error (%d): failed to set data_enable pin\r\n", ret);
-        return ret;
+    if(bus_dat->is_use_data_enable){
+        ret = gpio_pin_set_dt(data_enable, 1);
+        if(ret < 0){
+            LOG_ERR("Error (%d): failed to set data_enable pin\r\n", ret);
+            return ret;
+        }
     }
-}
 
     uint32_t total_send = 0;
     
@@ -200,17 +186,14 @@ if(is_use_data_enable){
 
     while(!uart_irq_tx_complete(uart_dev))
         k_sleep(K_USEC(1));
-if(is_use_data_enable){  
-    ret = gpio_pin_set_dt(data_enable, 0);
-    if(ret < 0){
-        LOG_ERR("Error (%d): failed to reset data_enable pin\r\n", ret);
-        return ret;
+
+    if(bus_dat->is_use_data_enable){  
+        ret = gpio_pin_set_dt(data_enable, 0);
+        if(ret < 0){
+            LOG_ERR("Error (%d): failed to reset data_enable pin\r\n", ret);
+            return ret;
+        }
     }
-    k_sleep(K_MSEC(1));
-    #if defined(READ_ONE_BYTE_AFTER_WRITE)
-    isWrongByteAfterSend= true;
-    #endif
-}
     return total_send;
 }
 
@@ -223,18 +206,17 @@ static int32_t b485_recv(const struct device * dev,
     int count = 0;
 
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
+    const struct bus_data *dat = (const struct bus_data*)dev->data;
     const struct device *uart_dev = cfg->uart_dev;
 
     uint64_t start_time = k_uptime_get();
     
     uart_irq_rx_enable(uart_dev);
     uint8_t *tmpBuf = buffer;
-    #if 1
         uint8_t data = 0; 
         k_timeout_t time_wait = Z_TIMEOUT_MS(timeout_ms);
         ret = k_msgq_get(&cfg->uart_rx_msgq, (uint8_t*)&data, time_wait);
         if(ret < 0){//break on timeout
-            isFirstReceive = false;
             uart_irq_rx_disable(uart_dev);
             return -EAGAIN;
         }
@@ -243,7 +225,7 @@ static int32_t b485_recv(const struct device * dev,
             count++;
         }
 
-        time_wait = Z_TIMEOUT_US(us_per_sym * SYM_COUNT_IDLE);
+        time_wait = Z_TIMEOUT_US(dat->us_per_sym * SYM_COUNT_IDLE);
 
         while(1){
             ret = k_msgq_get(&cfg->uart_rx_msgq, (uint8_t*)&data, time_wait);
@@ -257,33 +239,10 @@ static int32_t b485_recv(const struct device * dev,
             }
         }
 
-    #else
-    while(1){
-        if(count == 0 && ((k_uptime_get() - start_time) > timeout_ms)) //timeout
-            return -EAGAIN;
-        if(!isFirstReceive){
-            k_sleep(K_MSEC(10));
-            continue;
-        }
-        //read from queue
-        uint8_t data = 0;
-        k_timeout_t time_wait = Z_TIMEOUT_US(us_per_sym * SYM_COUNT_IDLE);
-        ret = k_msgq_get(&uart_rx_msgq, (uint8_t*)&data, time_wait);
-        if( ret == -EAGAIN && count > 0)
-            break;
-        else{
-            tmpBuf[count] = data;
-            count++;
-            if(count == buffer_size)
-                break;
-        }
-    }
-    #endif
     LOG_DBG("pack rcv with %d bytes\r\n", count);
     if(count > 0){
        LOG_HEXDUMP_INF(buffer, count, "Rcv buff");   
     }
-    isFirstReceive = false;
     uart_irq_rx_disable(uart_dev);
     return count;
 }
@@ -309,10 +268,11 @@ static int32_t b485_set_baudrate(const struct device * dev,
     struct uart_config config;
 
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
+    struct bus_data *dat = (const struct bus_data*)dev->data;
 
     const struct device * uart = cfg->uart_dev;
 
-    us_per_sym = BITS_IN_SYM * 1000000 / baudrate; 
+    dat->us_per_sym = BITS_IN_SYM * 1000000 / baudrate; 
 
     ret = uart_config_get(uart, &config);
     if(ret < 0){
@@ -343,15 +303,19 @@ static const struct bus485_driver_api bus485_driver_api_funcs = {
 
 //macro to define driver instance
 #define BUS485_DEFINE(inst)\
+    static struct bus_data bus_data_peripheral_data_##inst = { \
+        .us_per_sym = 1,                                        \
+    };\
     static struct bus485_config bus485_config_##inst = {      \
         .data_enable = GPIO_DT_SPEC_INST_GET(inst, pin_gpios),  \
         .uart_dev = DEVICE_DT_GET(DT_INST_BUS(inst)),\
+        .data = &bus_data_peripheral_data_##inst, \
         .id = inst                                                              \
     };          \
     DEVICE_DT_INST_DEFINE(inst,                                 \
                             bus485_init,                        \
                             NULL,                               \
-                            NULL,                               \
+                            &bus_data_peripheral_data_##inst,   \
                             &bus485_config_##inst,              \
                             POST_KERNEL,                  \
                             CUSTOM_BUS485_INIT_PRIORITY,          \

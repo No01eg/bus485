@@ -27,14 +27,6 @@ struct bus485_driver_api {
                                    uint32_t baudrate);
 };
 
-//configuration
-struct bus485_config {
-    const struct gpio_dt_spec data_enable;
-    const struct device * uart_dev;
-    uint32_t id;
-    uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
-    struct k_msgq uart_rx_msgq;
-    struct k_sem bus_sem;
-};
+
 
 #endif /* ZEPHYR_DRIVERS_BUS485_H_ */

@@ -163,7 +163,7 @@ int main(void){
 							  0,
 							  K_NO_WAIT);
 			
-	th3_tid = k_thread_create(&th3_thread,
+	/*th3_tid = k_thread_create(&th3_thread,
 							  th3_stack,
 							  K_THREAD_STACK_SIZEOF(th3_stack),
 							  th3_thread_start,
@@ -172,7 +172,7 @@ int main(void){
 							  NULL,
 							  7, 
 							  0,
-							  K_NO_WAIT);
+							  K_NO_WAIT);*/
 	
 	while(1){
 		k_msleep(2000);

@@ -9,9 +9,9 @@
 #include "bus485.h"
 
 #define CUSTOM_BUS485_INIT_PRIORITY CONFIG_CUSTOM_BUS485_INIT_PRIORITY
-#define QUEUE_SIZE CONFIG_CUSTOM_BUS485_QUEUE_SIZE
+#define QUEUE_SIZE CONFIG_CUSTOM_BUS485_RX_QUEUE_SIZE
 #define SYM_COUNT_IDLE CONFIG_CUSTOM_BUS485_RECV_SYM_IDLE_COUNT
-
+#define TX_QUEUE_SIZE CONFIG_CUSTOM_BUS485_TX_QUEUE_SIZE
 
 
 #define BITS_IN_SYM 10 // 1 start bit, 8 data bits, no parity, 1 stop bit (8n1 format )
@@ -34,6 +34,8 @@ struct bus485_config {
     uint32_t id;
     uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
     struct k_msgq uart_rx_msgq;
+    uint8_t uart_tx_msgq_buffer[TX_QUEUE_SIZE * sizeof(uint8_t)];
+    struct k_msgq uart_tx_msgq;
     struct k_sem bus_sem;
 };
 
@@ -49,15 +51,25 @@ static void interrupt_handler(const struct device *dev, void *user_data)
 
     while(uart_irq_update(uart_td) > 0 && uart_irq_is_pending(uart_td)){
         ret = uart_irq_rx_ready(uart_td);
-        if(ret < 0)
-            return;
-    
-        ret = uart_fifo_read(uart_td, buf, 1);
-        if(ret <= 0)
-            return;
-        else{
-            k_msgq_put(&cfg->uart_rx_msgq, buf, K_NO_WAIT);
+        if(ret == 1){
+            ret = uart_fifo_read(uart_td, buf, 1);
+            if(ret <= 0)
+                return;
+            else{
+                k_msgq_put(&cfg->uart_rx_msgq, buf, K_NO_WAIT);
+            }
         }
+        else if(uart_irq_tx_ready(uart_td)){
+            uint8_t data;
+            if(k_msgq_get(&cfg->uart_tx_msgq, &data, K_NO_WAIT) == 0){
+                uart_fifo_fill(uart_td, &data, 1);
+            }
+            else{
+                uart_irq_tx_disable(uart_td);
+            }
+        }
+        else
+            return;
     }
 }
 
@@ -105,6 +117,8 @@ static int bus485_init(const struct device * dev)
         return ret;
     }
     k_msgq_init(&cfg->uart_rx_msgq, cfg->uart_rx_msgq_buffer, sizeof(uint8_t), QUEUE_SIZE);
+
+    k_msgq_init(&cfg->uart_tx_msgq, cfg->uart_tx_msgq_buffer, sizeof(uint8_t), TX_QUEUE_SIZE);
 
     k_sem_init(&cfg->bus_sem, 1, 1);
 
@@ -154,14 +168,14 @@ int32_t bus485_send(const struct device * dev,
         }
     }
 
-    uint32_t total_send = 0;
+    int32_t total_send = 0;
     
     while(total_send < count){
-        int send = uart_fifo_fill(uart_dev, &buffer[total_send], count - total_send);
-        if(send > 0){
-            total_send += send;
-        }
+        if(k_msgq_put(&cfg->uart_tx_msgq, &buffer[total_send], K_NO_WAIT) > 0);
+            total_send++;
     }
+    uart_irq_tx_enable(uart_dev);
+
 
     while(!uart_irq_tx_complete(uart_dev))
         k_sleep(K_USEC(1));

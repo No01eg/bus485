@@ -10,8 +10,13 @@ config CUSTOM_BUS485_INIT_PRIORITY
     default 50
     range 1 100
 
-config CUSTOM_BUS485_QUEUE_SIZE
+config CUSTOM_BUS485_RX_QUEUE_SIZE
     int "Size of receive queue"
+    default 256
+    range 1 256
+
+config CUSTOM_BUS485_TX_QUEUE_SIZE
+    int "Size of transmit queue"
     default 256
     range 1 256
 

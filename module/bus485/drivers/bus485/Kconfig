@@ -23,7 +23,3 @@ config CUSTOM_BUS485_RECV_SYM_IDLE_COUNT
 config CUSTOM_BUS485_DE_ACTIVE
     bool "use pin data_enable"
     default y
-
-config CUSTOM_BUS485_CORRECTION_READ_AFTER_WRITE
-    bool "read waste single byte after toggle data_enable pin"
-    default y

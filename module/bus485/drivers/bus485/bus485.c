@@ -9,7 +9,7 @@
 #include "bus485.h"
 
 #define CUSTOM_BUS485_INIT_PRIORITY CONFIG_CUSTOM_BUS485_INIT_PRIORITY
-
+#define QUEUE_SIZE CONFIG_CUSTOM_BUS485_QUEUE_SIZE
 #define SYM_COUNT_IDLE CONFIG_CUSTOM_BUS485_RECV_SYM_IDLE_COUNT
 
 
@@ -36,27 +36,6 @@ struct bus485_config {
     struct k_msgq uart_rx_msgq;
     struct k_sem bus_sem;
 };
-
-
-static int bus485_init(const struct device * dev);
-
-static int32_t b485_lock(const struct device * dev);
-
-static int32_t b485_release(const struct device * dev);
-
-static int32_t b485_send(const struct device * dev,
-                           const uint8_t * buffer,
-                           uint32_t count);
-
-static int32_t b485_recv(const struct device * dev,
-                           const uint8_t * buffer,
-                           uint32_t buffer_size,
-                           uint32_t timeout_ms);
-
-static int32_t b485_flush(const struct device * dev);
-
-static int32_t b485_set_baudrate(const struct device * dev,
-                                   uint32_t baudrate);
 
 //----private------------------------------------------------
 
@@ -134,7 +113,7 @@ static int bus485_init(const struct device * dev)
 
 //----public api---------------------------------------------
 
-static int32_t b485_lock(const struct device * dev)
+int32_t bus485_lock(const struct device * dev)
 {
     int ret;
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
@@ -147,7 +126,7 @@ static int32_t b485_lock(const struct device * dev)
     return 0;
 }
 
-static int32_t b485_release(const struct device * dev)
+int32_t bus485_release(const struct device * dev)
 {
     int ret;
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
@@ -157,9 +136,9 @@ static int32_t b485_release(const struct device * dev)
     return 0;
 }
 
-static int32_t b485_send(const struct device * dev,
+int32_t bus485_send(const struct device * dev,
                            const uint8_t * buffer,
-                           uint32_t count)
+                           uint32_t count)                           
 {
     int ret;
 
@@ -197,10 +176,10 @@ static int32_t b485_send(const struct device * dev,
     return total_send;
 }
 
-static int32_t b485_recv(const struct device * dev,
+int32_t bus485_recv(const struct device * dev,
                            const uint8_t * buffer,
                            uint32_t buffer_size,
-                           uint32_t timeout_ms)
+                           uint32_t timeout_ms)                           
 {
     int ret;
     int count = 0;
@@ -247,7 +226,7 @@ static int32_t b485_recv(const struct device * dev,
     return count;
 }
 
-static int32_t b485_flush(const struct device * dev)
+int32_t bus485_flush(const struct device * dev)
 {
     int ret;
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
@@ -260,7 +239,7 @@ static int32_t b485_flush(const struct device * dev)
     return 0;
 }
 
-static int32_t b485_set_baudrate(const struct device * dev,
+int32_t bus485_set_baudrate(const struct device * dev,
                                    uint32_t baudrate)
 {
     int ret;
@@ -291,15 +270,6 @@ static int32_t b485_set_baudrate(const struct device * dev,
     return 0;
 }
 
-//--------Devicetree handling --------------------
-static const struct bus485_driver_api bus485_driver_api_funcs = {
-    .bus485_lock = b485_lock,
-    .bus485_release = b485_release,
-    .bus485_send = b485_send,
-    .bus485_recv = b485_recv,
-    .bus485_flush = b485_flush, 
-    .bus485_set_baudrate = b485_set_baudrate,
-};
 
 //macro to define driver instance
 #define BUS485_DEFINE(inst)\
@@ -319,7 +289,7 @@ static const struct bus485_driver_api bus485_driver_api_funcs = {
                             &bus485_config_##inst,              \
                             POST_KERNEL,                  \
                             CUSTOM_BUS485_INIT_PRIORITY,          \
-                            &bus485_driver_api_funcs);          \
+                            NULL);          \
 
 
 DT_INST_FOREACH_STATUS_OKAY(BUS485_DEFINE)

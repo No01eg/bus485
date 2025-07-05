@@ -37,6 +37,7 @@ struct bus485_config {
     uint8_t uart_tx_msgq_buffer[TX_QUEUE_SIZE * sizeof(uint8_t)];
     struct k_msgq uart_tx_msgq;
     struct k_sem bus_sem;
+    struct k_sem tx_sem;
 };
 
 //----private------------------------------------------------
@@ -66,6 +67,7 @@ static void interrupt_handler(const struct device *dev, void *user_data)
             }
             else{
                 uart_irq_tx_disable(uart_td);
+                k_sem_give(&cfg->tx_sem);
             }
         }
         else
@@ -121,6 +123,7 @@ static int bus485_init(const struct device * dev)
     k_msgq_init(&cfg->uart_tx_msgq, cfg->uart_tx_msgq_buffer, sizeof(uint8_t), TX_QUEUE_SIZE);
 
     k_sem_init(&cfg->bus_sem, 1, 1);
+    k_sem_init(&cfg->tx_sem, 0, 1);
 
     return 0;
 }
@@ -176,9 +179,7 @@ int32_t bus485_send(const struct device * dev,
     }
     uart_irq_tx_enable(uart_dev);
 
-
-    while(!uart_irq_tx_complete(uart_dev))
-        k_sleep(K_USEC(1));
+    k_sem_take(&cfg->tx_sem, K_FOREVER);
 
     if(bus_dat->is_use_data_enable){  
         ret = gpio_pin_set_dt(data_enable, 0);

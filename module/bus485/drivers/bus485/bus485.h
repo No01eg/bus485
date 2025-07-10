@@ -13,7 +13,7 @@ int32_t bus485_send(const struct device * dev,
                     uint32_t count);
 
 int32_t bus485_recv(const struct device * dev,
-                    const uint8_t * buffer,
+                    uint8_t * buffer,
                     uint32_t buffer_size,
                     uint32_t timeout_ms);
 

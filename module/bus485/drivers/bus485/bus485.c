@@ -24,14 +24,6 @@ LOG_MODULE_REGISTER(bus485);
 struct bus_data{
     uint32_t us_per_sym;
     bool is_use_data_enable;
-};
-
-//configuration
-struct bus485_config {
-    const struct gpio_dt_spec data_enable;
-    const struct device * uart_dev;
-    struct bus_data *data;
-    uint32_t id;
     uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
     struct k_msgq uart_rx_msgq;
     uint8_t uart_tx_msgq_buffer[TX_QUEUE_SIZE * sizeof(uint8_t)];
@@ -40,12 +32,21 @@ struct bus485_config {
     struct k_sem tx_sem;
 };
 
+//configuration
+struct bus485_config {
+    const struct gpio_dt_spec data_enable;
+    const struct device * uart_dev;
+    struct bus_data *data;
+    uint32_t id;
+    
+};
+
 //----private------------------------------------------------
 
 static void interrupt_handler(const struct device *dev, void *user_data)
 {
-    const struct bus485_config *cfg = (const struct bus485_config*)user_data;
-    const struct device *uart_td = cfg->uart_dev;
+    struct bus_data *bus_dat = (struct bus_data*)user_data;
+    const struct device *uart_td = dev;
     uint8_t buf[1];
 
     int ret;
@@ -57,17 +58,17 @@ static void interrupt_handler(const struct device *dev, void *user_data)
             if(ret <= 0)
                 return;
             else{
-                k_msgq_put(&cfg->uart_rx_msgq, buf, K_NO_WAIT);
+                k_msgq_put(&bus_dat->uart_rx_msgq, buf, K_NO_WAIT);
             }
         }
         else if(uart_irq_tx_ready(uart_td)){
             uint8_t data;
-            if(k_msgq_get(&cfg->uart_tx_msgq, &data, K_NO_WAIT) == 0){
+            if(k_msgq_get(&bus_dat->uart_tx_msgq, &data, K_NO_WAIT) == 0){
                 uart_fifo_fill(uart_td, &data, 1);
             }
             else{
                 uart_irq_tx_disable(uart_td);
-                k_sem_give(&cfg->tx_sem);
+                k_sem_give(&bus_dat->tx_sem);
             }
         }
         else
@@ -86,7 +87,7 @@ static int bus485_init(const struct device * dev)
     
     const struct device *uart_dev = cfg->uart_dev;
 
-    struct bus_data *bus_dat = (const struct bus_data*)dev->data;
+    struct bus_data *bus_dat = (struct bus_data*)dev->data;
     #if CONFIG_CUSTOM_BUS485_DE_ACTIVE
     bus_dat->is_use_data_enable = true;
     #else
@@ -113,17 +114,17 @@ static int bus485_init(const struct device * dev)
 
     uart_irq_rx_disable(uart_dev);
 	uart_irq_tx_disable(uart_dev);
-    ret = uart_irq_callback_user_data_set(uart_dev, interrupt_handler, (void*)cfg);
+    ret = uart_irq_callback_user_data_set(uart_dev, interrupt_handler, (void*)bus_dat);
     if(ret < 0){
         LOG_ERR("Could not accept interrupt for uart (%d)\r\n", ret);
         return ret;
     }
-    k_msgq_init(&cfg->uart_rx_msgq, cfg->uart_rx_msgq_buffer, sizeof(uint8_t), QUEUE_SIZE);
+    k_msgq_init(&bus_dat->uart_rx_msgq, bus_dat->uart_rx_msgq_buffer, sizeof(uint8_t), QUEUE_SIZE);
 
-    k_msgq_init(&cfg->uart_tx_msgq, cfg->uart_tx_msgq_buffer, sizeof(uint8_t), TX_QUEUE_SIZE);
+    k_msgq_init(&bus_dat->uart_tx_msgq, bus_dat->uart_tx_msgq_buffer, sizeof(uint8_t), TX_QUEUE_SIZE);
 
-    k_sem_init(&cfg->bus_sem, 1, 1);
-    k_sem_init(&cfg->tx_sem, 0, 1);
+    k_sem_init(&bus_dat->bus_sem, 1, 1);
+    k_sem_init(&bus_dat->tx_sem, 0, 1);
 
     return 0;
 }
@@ -133,9 +134,8 @@ static int bus485_init(const struct device * dev)
 int32_t bus485_lock(const struct device * dev)
 {
     int ret;
-    const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
-
-    ret = k_sem_take(&cfg->bus_sem, K_FOREVER);
+    struct bus_data *bus_dat = (struct bus_data*)dev->data;
+    ret = k_sem_take(&bus_dat->bus_sem, K_FOREVER);
     if(ret < 0){
         return ret;
     }
@@ -145,10 +145,8 @@ int32_t bus485_lock(const struct device * dev)
 
 int32_t bus485_release(const struct device * dev)
 {
-    int ret;
-    const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
-
-    k_sem_give(&cfg->bus_sem);
+    struct bus_data *bus_dat = (struct bus_data*)dev->data;
+    k_sem_give(&bus_dat->bus_sem);
 
     return 0;
 }
@@ -160,7 +158,7 @@ int32_t bus485_send(const struct device * dev,
     int ret;
 
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
-    const struct bus_data *bus_dat = (const struct bus_data*)dev->data;
+    struct bus_data *bus_dat = (struct bus_data*)dev->data;
     const struct device *uart_dev = cfg->uart_dev;
     const struct gpio_dt_spec *data_enable = &cfg->data_enable;
     if(bus_dat->is_use_data_enable){
@@ -174,12 +172,12 @@ int32_t bus485_send(const struct device * dev,
     int32_t total_send = 0;
     
     while(total_send < count){
-        if(k_msgq_put(&cfg->uart_tx_msgq, &buffer[total_send], K_NO_WAIT) > 0);
+        if(k_msgq_put(&bus_dat->uart_tx_msgq, &buffer[total_send], K_NO_WAIT) == 0)
             total_send++;
     }
     uart_irq_tx_enable(uart_dev);
 
-    k_sem_take(&cfg->tx_sem, K_FOREVER);
+    k_sem_take(&bus_dat->tx_sem, K_FOREVER);
 
     if(bus_dat->is_use_data_enable){  
         ret = gpio_pin_set_dt(data_enable, 0);
@@ -192,46 +190,43 @@ int32_t bus485_send(const struct device * dev,
 }
 
 int32_t bus485_recv(const struct device * dev,
-                           const uint8_t * buffer,
-                           uint32_t buffer_size,
-                           uint32_t timeout_ms)                           
+                    uint8_t * buffer,
+                    uint32_t buffer_size,
+                    uint32_t timeout_ms)                           
 {
     int ret;
     int count = 0;
 
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
-    const struct bus_data *dat = (const struct bus_data*)dev->data;
     const struct device *uart_dev = cfg->uart_dev;
+    struct bus_data *dat = (struct bus_data*)dev->data;
 
-    uint64_t start_time = k_uptime_get();
-    
     uart_irq_rx_enable(uart_dev);
-    uint8_t *tmpBuf = buffer;
-        uint8_t data = 0; 
-        k_timeout_t time_wait = Z_TIMEOUT_MS(timeout_ms);
-        ret = k_msgq_get(&cfg->uart_rx_msgq, (uint8_t*)&data, time_wait);
-        if(ret < 0){//break on timeout
-            uart_irq_rx_disable(uart_dev);
-            return -EAGAIN;
-        }
+    uint8_t data = 0; 
+    k_timeout_t time_wait = Z_TIMEOUT_MS(timeout_ms);
+    ret = k_msgq_get(&dat->uart_rx_msgq, (uint8_t*)&data, time_wait);
+    if(ret < 0){//break on timeout
+        uart_irq_rx_disable(uart_dev);
+        return -EAGAIN;
+    }
+    else{
+        buffer[count] = data;
+        count++;
+    }
+
+    time_wait = Z_TIMEOUT_US(dat->us_per_sym * SYM_COUNT_IDLE);
+
+    while(1){
+        ret = k_msgq_get(&dat->uart_rx_msgq, (uint8_t*)&data, time_wait);
+        if( ret == -EAGAIN)//check idle 
+            break;
         else{
-            tmpBuf[count] = data;
+            buffer[count] = data;
             count++;
-        }
-
-        time_wait = Z_TIMEOUT_US(dat->us_per_sym * SYM_COUNT_IDLE);
-
-        while(1){
-            ret = k_msgq_get(&cfg->uart_rx_msgq, (uint8_t*)&data, time_wait);
-            if( ret == -EAGAIN)//check idle 
+            if(count == buffer_size)
                 break;
-            else{
-                tmpBuf[count] = data;
-                count++;
-                if(count == buffer_size)
-                    break;
-            }
         }
+    }
 
     LOG_DBG("pack rcv with %d bytes\r\n", count);
     if(count > 0){
@@ -244,8 +239,9 @@ int32_t bus485_recv(const struct device * dev,
 int32_t bus485_flush(const struct device * dev)
 {
     int ret;
-    const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
-    ret = k_msgq_cleanup(&cfg->uart_rx_msgq);
+    struct bus_data *bus_dat = (struct bus_data*)dev->data;
+
+    ret = k_msgq_cleanup(&bus_dat->uart_rx_msgq);
     if(ret < 0){
         LOG_ERR("Failed to cleanup queue (%d)\r\n", ret);
         return ret;
@@ -262,7 +258,7 @@ int32_t bus485_set_baudrate(const struct device * dev,
     struct uart_config config;
 
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
-    struct bus_data *dat = (const struct bus_data*)dev->data;
+    struct bus_data *dat = (struct bus_data*)dev->data;
 
     const struct device * uart = cfg->uart_dev;
 
@@ -270,7 +266,7 @@ int32_t bus485_set_baudrate(const struct device * dev,
 
     ret = uart_config_get(uart, &config);
     if(ret < 0){
-        LOG_ERR("Error (%d): failed to read uart param\r\n");
+        LOG_ERR("Error (%d): failed to read uart param\r\n",ret);
         return ret;
     }
 
@@ -278,7 +274,7 @@ int32_t bus485_set_baudrate(const struct device * dev,
 
     ret = uart_configure(uart, &config);
     if(ret < 0){
-        LOG_ERR("Error (%d): failed to accept new uart param\r\n");
+        LOG_ERR("Error (%d): failed to accept new uart param\r\n", ret);
         return ret;
     }
 
@@ -291,7 +287,7 @@ int32_t bus485_set_baudrate(const struct device * dev,
     static struct bus_data bus_data_peripheral_data_##inst = { \
         .us_per_sym = 1,                                        \
     };\
-    static struct bus485_config bus485_config_##inst = {      \
+    static const struct bus485_config bus485_config_##inst = {      \
         .data_enable = GPIO_DT_SPEC_INST_GET(inst, pin_gpios),  \
         .uart_dev = DEVICE_DT_GET(DT_INST_BUS(inst)),\
         .data = &bus_data_peripheral_data_##inst, \

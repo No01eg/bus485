@@ -122,7 +122,7 @@ void th3_thread_start(void *arg_1, void *arg_2, void *arg_3){
 
 
 int main(void){
-    int ret;
+    
 	k_tid_t th1_tid;
 	k_tid_t th2_tid;
 	k_tid_t th3_tid;

@@ -68,7 +68,6 @@ static void interrupt_handler(const struct device *dev, void *user_data)
             }
             else{
                 uart_irq_tx_disable(uart_td);
-                uart_irq_rx_enable(uart_td);
                 k_sem_give(&bus_dat->tx_sem);
             }
         }
@@ -126,6 +125,7 @@ static int bus485_init(const struct device * dev)
 
     k_sem_init(&bus_dat->bus_sem, 1, 1);
     k_sem_init(&bus_dat->tx_sem, 0, 1);
+    uart_irq_rx_enable(uart_dev);
 
     return 0;
 }
@@ -206,7 +206,6 @@ int32_t bus485_recv(const struct device * dev,
     k_timeout_t time_wait = Z_TIMEOUT_MS(timeout_ms);
     ret = k_msgq_get(&dat->uart_rx_msgq, (uint8_t*)&data, time_wait);
     if(ret < 0){//break on timeout
-        uart_irq_rx_disable(uart_dev);
         return -EAGAIN;
     }
     else{
@@ -232,7 +231,6 @@ int32_t bus485_recv(const struct device * dev,
     if(count > 0){
        LOG_HEXDUMP_INF(buffer, count, "Rcv buff");   
     }
-    uart_irq_rx_disable(uart_dev);
     return count;
 }
 

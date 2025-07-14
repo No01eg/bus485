@@ -24,6 +24,7 @@ LOG_MODULE_REGISTER(bus485);
 struct bus_data{
     uint32_t us_per_sym;
     bool is_use_data_enable;
+    bool receive_queue_full;
     uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
     struct k_msgq uart_rx_msgq;
     uint8_t uart_tx_msgq_buffer[TX_QUEUE_SIZE * sizeof(uint8_t)];
@@ -58,7 +59,12 @@ static void interrupt_handler(const struct device *dev, void *user_data)
             if(ret <= 0)
                 return;
             else{
-                k_msgq_put(&bus_dat->uart_rx_msgq, buf, K_NO_WAIT);
+                if(k_msgq_num_used_get(&bus_dat->uart_rx_msgq) == QUEUE_SIZE){
+                    bus_dat->receive_queue_full = true;
+                }
+                else{
+                    k_msgq_put(&bus_dat->uart_rx_msgq, buf, K_NO_WAIT);
+                }
             }
         }
         else if(uart_irq_tx_ready(uart_td)){
@@ -126,6 +132,7 @@ static int bus485_init(const struct device * dev)
     k_sem_init(&bus_dat->bus_sem, 1, 1);
     k_sem_init(&bus_dat->tx_sem, 0, 1);
     uart_irq_rx_enable(uart_dev);
+    bus_dat->receive_queue_full = false;
 
     return 0;
 }
@@ -199,7 +206,6 @@ int32_t bus485_recv(const struct device * dev,
     int count = 0;
 
     const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
-    const struct device *uart_dev = cfg->uart_dev;
     struct bus_data *dat = (struct bus_data*)dev->data;
 
     uint8_t data = 0; 
@@ -239,6 +245,10 @@ int32_t bus485_flush(const struct device * dev)
     int ret;
     struct bus_data *bus_dat = (struct bus_data*)dev->data;
 
+    if(bus_dat->receive_queue_full == true)
+        LOG_DBG("Rx queue was overflow\r\n");
+        
+    bus_dat->receive_queue_full = false;
     ret = k_msgq_cleanup(&bus_dat->uart_rx_msgq);
     if(ret < 0){
         LOG_ERR("Failed to cleanup RX queue (%d)\r\n", ret);

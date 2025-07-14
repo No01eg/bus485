@@ -68,6 +68,7 @@ static void interrupt_handler(const struct device *dev, void *user_data)
             }
             else{
                 uart_irq_tx_disable(uart_td);
+                uart_irq_rx_enable(uart_td);
                 k_sem_give(&bus_dat->tx_sem);
             }
         }
@@ -186,7 +187,6 @@ int32_t bus485_send(const struct device * dev,
             return ret;
         }
     }
-    uart_irq_rx_enable(uart_dev);
     return total_send;
 }
 

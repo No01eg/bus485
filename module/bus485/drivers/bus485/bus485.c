@@ -241,7 +241,13 @@ int32_t bus485_flush(const struct device * dev)
 
     ret = k_msgq_cleanup(&bus_dat->uart_rx_msgq);
     if(ret < 0){
-        LOG_ERR("Failed to cleanup queue (%d)\r\n", ret);
+        LOG_ERR("Failed to cleanup RX queue (%d)\r\n", ret);
+        return ret;
+    }
+
+    ret = k_msgq_cleanup(&bus_dat->uart_tx_msgq);
+    if(ret < 0){
+        LOG_ERR("Failed to cleanup TX queue (%d)\r\n", ret);
         return ret;
     }
 

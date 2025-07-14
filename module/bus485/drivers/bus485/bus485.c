@@ -186,6 +186,7 @@ int32_t bus485_send(const struct device * dev,
             return ret;
         }
     }
+    uart_irq_rx_enable(uart_dev);
     return total_send;
 }
 
@@ -201,7 +202,6 @@ int32_t bus485_recv(const struct device * dev,
     const struct device *uart_dev = cfg->uart_dev;
     struct bus_data *dat = (struct bus_data*)dev->data;
 
-    uart_irq_rx_enable(uart_dev);
     uint8_t data = 0; 
     k_timeout_t time_wait = Z_TIMEOUT_MS(timeout_ms);
     ret = k_msgq_get(&dat->uart_rx_msgq, (uint8_t*)&data, time_wait);

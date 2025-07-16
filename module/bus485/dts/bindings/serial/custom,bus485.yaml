@@ -7,4 +7,4 @@ include: uart-device.yaml
 properties:
   pin-gpios:
     type: phandle-array
-    required: true
+    

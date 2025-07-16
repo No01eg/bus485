@@ -23,7 +23,6 @@ LOG_MODULE_REGISTER(bus485);
 
 struct bus_data{
     uint32_t us_per_sym;
-    bool is_use_data_enable;
     bool receive_queue_full;
     uint8_t uart_rx_msgq_buffer[QUEUE_SIZE * sizeof(uint8_t)];
     struct k_msgq uart_rx_msgq;
@@ -39,7 +38,6 @@ struct bus485_config {
     const struct device * uart_dev;
     struct bus_data *data;
     uint32_t id;
-    
 };
 
 //----private------------------------------------------------
@@ -94,18 +92,13 @@ static int bus485_init(const struct device * dev)
     const struct device *uart_dev = cfg->uart_dev;
 
     struct bus_data *bus_dat = (struct bus_data*)dev->data;
-    #if CONFIG_CUSTOM_BUS485_DE_ACTIVE
-    bus_dat->is_use_data_enable = true;
-    #else
-    bus_dat->is_use_data_enable = false;
-    #endif
     LOG_DBG("Initializing bus485 (instance ID: %u)\r\n", cfg->id);
 
     if (!device_is_ready(uart_dev)){
         LOG_ERR("UART is not found\r\n");
         return -ENODEV;
     }
-    if(bus_dat->is_use_data_enable){
+    if(data_enable->port != NULL){
         if(!gpio_is_ready_dt(data_enable)){
             LOG_ERR("GPIO is not ready\r\n");
             return -ENODEV;
@@ -169,7 +162,7 @@ int32_t bus485_send(const struct device * dev,
     struct bus_data *bus_dat = (struct bus_data*)dev->data;
     const struct device *uart_dev = cfg->uart_dev;
     const struct gpio_dt_spec *data_enable = &cfg->data_enable;
-    if(bus_dat->is_use_data_enable){
+    if(data_enable->port != NULL){
         ret = gpio_pin_set_dt(data_enable, 1);
         if(ret < 0){
             LOG_ERR("Error (%d): failed to set data_enable pin\r\n", ret);
@@ -187,7 +180,7 @@ int32_t bus485_send(const struct device * dev,
 
     k_sem_take(&bus_dat->tx_sem, K_FOREVER);
 
-    if(bus_dat->is_use_data_enable){  
+    if(data_enable->port != NULL){  
         ret = gpio_pin_set_dt(data_enable, 0);
         if(ret < 0){
             LOG_ERR("Error (%d): failed to reset data_enable pin\r\n", ret);
@@ -205,7 +198,6 @@ int32_t bus485_recv(const struct device * dev,
     int ret;
     int count = 0;
 
-    const struct bus485_config *cfg = (const struct bus485_config*)dev->config;
     struct bus_data *dat = (struct bus_data*)dev->data;
 
     uint8_t data = 0; 
@@ -299,10 +291,10 @@ int32_t bus485_set_baudrate(const struct device * dev,
 //macro to define driver instance
 #define BUS485_DEFINE(inst)\
     static struct bus_data bus_data_peripheral_data_##inst = { \
-        .us_per_sym = 1,                                        \
+        .us_per_sym = 1                                        \
     };\
     static const struct bus485_config bus485_config_##inst = {      \
-        .data_enable = GPIO_DT_SPEC_INST_GET(inst, pin_gpios),  \
+        .data_enable = GPIO_DT_SPEC_INST_GET_OR(inst, pin_gpios, {0}),  \
         .uart_dev = DEVICE_DT_GET(DT_INST_BUS(inst)),\
         .data = &bus_data_peripheral_data_##inst, \
         .id = inst                                                              \

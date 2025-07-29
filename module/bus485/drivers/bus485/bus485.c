@@ -268,6 +268,8 @@ int32_t bus485_set_baudrate(const struct device * dev,
 
     const struct device * uart = cfg->uart_dev;
 
+    uart_irq_rx_disable(uart);
+
     dat->us_per_sym = BITS_IN_SYM * 1000000 / baudrate; 
 
     ret = uart_config_get(uart, &config);
@@ -283,6 +285,8 @@ int32_t bus485_set_baudrate(const struct device * dev,
         LOG_ERR("Error (%d): failed to accept new uart param\r\n", ret);
         return ret;
     }
+
+    uart_irq_rx_enable(uart);
 
     return 0;
 }

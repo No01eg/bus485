@@ -4,7 +4,7 @@
 	current-speed = <115200>;
 	status = "okay";
     b485_1: bus485 {
-        compatible = "custom,bus485";
+        compatible = "strim,bus485";
         pin-gpios = <&gpiob 13 GPIO_ACTIVE_HIGH>;
         label="bus485";
         status="okay";
@@ -17,7 +17,7 @@
     pinctrl-names= "default";
     status="okay";
     b485: bus485 {
-        compatible = "custom,bus485";
+        compatible = "strim,bus485";
         pin-gpios = <&gpiod 4 GPIO_ACTIVE_HIGH>;
         label="bus485";
         status="okay";

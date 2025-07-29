@@ -1,6 +1,6 @@
-description: Custom bus485
+description: Strim bus485
 
-compatible: "custom,bus485"
+compatible: "strim,bus485"
 
 include: uart-device.yaml
 

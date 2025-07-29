@@ -1,26 +1,26 @@
-config CUSTOM_BUS485
-    bool "Custom bus485"
+config STRIM_BUS485
+    bool "Strim bus485"
     default n 
     depends on UART_INTERRUPT_DRIVEN && GPIO
     help
-        Enable the custom bus485 driver.
+        Enable the strim bus485 driver.
 
-config CUSTOM_BUS485_INIT_PRIORITY
+config STRIM_BUS485_INIT_PRIORITY
     int "Initialization priority"
     default 50
     range 1 100
 
-config CUSTOM_BUS485_RX_QUEUE_SIZE
+config STRIM_BUS485_RX_QUEUE_SIZE
     int "Size of receive queue"
     default 256
     range 1 256
 
-config CUSTOM_BUS485_TX_QUEUE_SIZE
+config STRIM_BUS485_TX_QUEUE_SIZE
     int "Size of transmit queue"
     default 256
     range 1 256
 
-config CUSTOM_BUS485_RECV_SYM_IDLE_COUNT
+config STRIM_BUS485_RECV_SYM_IDLE_COUNT
     int "count symbols for wait idle status on bus"
     default 5
     range 3 5

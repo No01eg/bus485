@@ -1,5 +1,5 @@
-//'compatible = "custom,bus485"' node in the Devicetree
-#define DT_DRV_COMPAT custom_bus485
+//'compatible = "strim,bus485"' node in the Devicetree
+#define DT_DRV_COMPAT strim_bus485
 
 #include <errno.h>
 #include <zephyr/logging/log.h>
@@ -8,10 +8,10 @@
 
 #include "bus485.h"
 
-#define CUSTOM_BUS485_INIT_PRIORITY CONFIG_CUSTOM_BUS485_INIT_PRIORITY
-#define QUEUE_SIZE CONFIG_CUSTOM_BUS485_RX_QUEUE_SIZE
-#define SYM_COUNT_IDLE CONFIG_CUSTOM_BUS485_RECV_SYM_IDLE_COUNT
-#define TX_QUEUE_SIZE CONFIG_CUSTOM_BUS485_TX_QUEUE_SIZE
+#define STRIM_BUS485_INIT_PRIORITY CONFIG_STRIM_BUS485_INIT_PRIORITY
+#define QUEUE_SIZE CONFIG_STRIM_BUS485_RX_QUEUE_SIZE
+#define SYM_COUNT_IDLE CONFIG_STRIM_BUS485_RECV_SYM_IDLE_COUNT
+#define TX_QUEUE_SIZE CONFIG_STRIM_BUS485_TX_QUEUE_SIZE
 
 
 #define BITS_IN_SYM 10 // 1 start bit, 8 data bits, no parity, 1 stop bit (8n1 format )
@@ -309,7 +309,7 @@ int32_t bus485_set_baudrate(const struct device * dev,
                             &bus_data_peripheral_data_##inst,   \
                             &bus485_config_##inst,              \
                             POST_KERNEL,                  \
-                            CUSTOM_BUS485_INIT_PRIORITY,          \
+                            STRIM_BUS485_INIT_PRIORITY,          \
                             NULL);          \
 
 

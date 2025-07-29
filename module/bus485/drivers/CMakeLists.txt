@@ -1,1 +1,1 @@
-add_subdirectory_ifdef(CONFIG_CUSTOM_BUS485 bus485)
+add_subdirectory_ifdef(CONFIG_STRIM_BUS485 bus485)

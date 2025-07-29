@@ -227,7 +227,7 @@ int32_t bus485_recv(const struct device * dev,
 
     LOG_DBG("pack rcv with %d bytes\r\n", count);
     if(count > 0){
-       LOG_HEXDUMP_INF(buffer, count, "Rcv buff");   
+       LOG_HEXDUMP_DBG(buffer, count, "Rcv buff");   
     }
     return count;
 }

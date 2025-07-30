@@ -7,7 +7,7 @@
         compatible = "strim,bus485";
         pin-gpios = <&gpiob 13 GPIO_ACTIVE_HIGH>;
         label="bus485";
-        status="okay";
+        status="disabled";
     };
 };
 

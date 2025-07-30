@@ -22,7 +22,7 @@ static struct k_thread th3_thread;
 
 static const struct device * bus = DEVICE_DT_GET(DT_NODELABEL(b485));
 
-static const struct device * bus_1 = DEVICE_DT_GET(DT_NODELABEL(b485_1));
+static const struct device * bus_1 = DEVICE_DT_GET_OR_NULL(DT_NODELABEL(b485_1));
 
 
 void th1_thread_start(void *arg_1, void *arg_2, void *arg_3){
@@ -130,11 +130,12 @@ int main(void){
         printk("Error: bus are not ready\r\n");
         return -ENODEV;
     }
-    
-	if(!device_is_ready(bus_1)){
-        printk("Error: bus_1 are not ready\r\n");
-        return -ENODEV;
-    }
+    if(bus_1 != NULL){
+		if(!device_is_ready(bus_1)){
+			printk("Error: bus_1 are not ready\r\n");
+			return -ENODEV;
+		}
+	}
     
     printk("PROJECT start\r\n");
 
@@ -159,8 +160,8 @@ int main(void){
 							  7, 
 							  0,
 							  K_NO_WAIT);
-			
-	th3_tid = k_thread_create(&th3_thread,
+	if(bus_1 != NULL){		
+		th3_tid = k_thread_create(&th3_thread,
 							  th3_stack,
 							  K_THREAD_STACK_SIZEOF(th3_stack),
 							  th3_thread_start,
@@ -170,6 +171,7 @@ int main(void){
 							  7, 
 							  0,
 							  K_NO_WAIT);
+	}
 	
 	while(1){
 		k_msleep(2000);

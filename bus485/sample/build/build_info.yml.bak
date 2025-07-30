@@ -1,5 +1,0 @@
-west:
-  command: /home/no01eg/.local/bin/west build -p always -b nucleo_f767zi /home/no01eg/work/Tz/Bus485/bus485/sample/
-    -d /home/no01eg/work/Tz/Bus485/bus485/sample/build/ -- -DDTCAY_FILE=boards/nucleo_f767zi.overlay
-  topdir: /home/no01eg/zephyrproject
-  version: 1.4.0

@@ -19,7 +19,7 @@
 
 
 //Enable logging
-LOG_MODULE_REGISTER(bus485);
+LOG_MODULE_REGISTER(bus485, CONFIG_STRIM_BUS485_LOG_LEVEL);
 
 struct bus_data{
     uint32_t us_per_sym;

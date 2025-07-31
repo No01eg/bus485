@@ -6,6 +6,8 @@ config STRIM_BUS485
     help
         Enable the strim bus485 driver.
 
+if STRIM_BUS485        
+
 config STRIM_BUS485_INIT_PRIORITY
     int "Initialization priority"
     default 50
@@ -26,11 +28,8 @@ config STRIM_BUS485_RECV_SYM_IDLE_COUNT
     default 5
     range 3 5
 
+module = BUS485
+module-str = bus485
 source "subsys/logging/Kconfig.template.log_config"
 
-config STRIM_BUS485_LOG_LEVEL
-    int "bus485 driver log level"
-    default 4
-    range 0 4
-    help
-        Set the log level for bus485 module. 0=Off, 1=Error, 2=Warning, 3=Info, 4=Debug.
+endif # STRIM_BUS485

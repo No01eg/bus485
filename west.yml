@@ -9,5 +9,5 @@ manifest:
       import: true
       
   self:
-    path: apps
+    path: apps/bus485
 

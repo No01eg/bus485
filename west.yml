@@ -1,11 +1,6 @@
 manifest:
-  version: "1.0"
-
   projects:
     - name: zephyr
       revision: main
       url: https://github.com/zephyrproject-rtos/zephyr
-      import:
-        name-allowlist:
-          - cmsis_6
-          - hal_stm32
+  

@@ -2,7 +2,10 @@ manifest:
   version: "1.0"
 
   projects:
-    - name: bus485
-      url: https://github.com/No01eg/bus485.git
-      path: modules/bus485
+    - name: zephyr
       revision: main
+      url: https://github.com/zephyrproject-rtos/zephyr
+      import:
+        name-allowlist:
+          - cmsis_6
+          - hal_stm32
